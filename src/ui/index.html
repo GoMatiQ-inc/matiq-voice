@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'none'; img-src 'self'; media-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Verbatim</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header><div class="wordmark"><span class="symbol" aria-hidden="true">〰</span> Verbatim</div><span class="local">On your device</span></header>
+  <main>
+    <section class="recorder" aria-labelledby="heading">
+      <h1 id="heading">Your words, as spoken.</h1>
+      <p class="intro">Local dictation. The recognizer’s text, without rewriting.</p>
+      <div class="recording-row"><button id="record" class="record-button" disabled>Start dictation</button><span id="timer" aria-label="Recording duration">0:00</span><button id="cancel" class="quiet" hidden>Cancel</button></div>
+      <p class="shortcut">In any app: <kbd id="shortcut">Ctrl + Alt + Space</kbd> to start and stop.</p>
+      <p id="status" class="status" role="status">Checking your setup…</p>
+      <progress id="level" max="1" value="0" aria-label="Microphone input level"></progress>
+      <p id="notice" class="notice" role="alert" hidden></p>
+    </section>
+    <section class="transcript" aria-labelledby="transcript-heading">
+      <div class="section-heading"><h2 id="transcript-heading">Last transcript</h2><div><button id="retry" class="quiet" hidden>Retry recording</button><button id="clear" class="quiet">Clear</button><button id="copy" class="secondary" disabled>Copy</button></div></div>
+      <textarea id="transcript" readonly aria-label="Last transcript" placeholder="Your next dictation will appear here. You can always copy it again."></textarea>
+      <p class="caption">Kept in memory until you clear it or quit. Recognition can still make mistakes.</p>
+    </section>
+    <details open>
+      <summary>Setup & preferences</summary>
+      <div class="settings">
+        <label for="model">Speech model</label><div class="field-row"><select id="model"></select><button id="download" class="secondary">Download model</button></div>
+        <p id="model-status" class="caption"></p>
+        <label for="microphone">Microphone</label><div class="field-row"><select id="microphone"><option value="">System default</option></select><button id="refresh" class="quiet">Refresh</button></div>
+        <label class="checkbox"><input type="checkbox" id="autoPaste" checked> Paste into the active app after shortcut dictation</label>
+        <p class="caption">Automatic paste replaces your clipboard. If you change apps, copy the result yourself. Starting here keeps the result in this window.</p>
+        <div class="field-row"><button id="save" class="secondary">Save preferences</button><button id="accessibility" class="quiet">Paste permissions</button></div>
+      </div>
+    </details>
+    <footer>Audio stays on this machine. Internet is used only when you download a model.<br>Five minutes per recording. English models in this first build.</footer>
+  </main>
+  <script type="module" src="renderer.mjs"></script>
+</body>
+</html>

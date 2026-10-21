@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.engine-build/
+.build-tools/
+.validation/
+engine/*
+!engine/.gitkeep
+*.log
+.DS_Store
