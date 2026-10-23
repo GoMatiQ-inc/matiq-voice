@@ -37,6 +37,18 @@ int main(int argc, const char *argv[]) {
             }
             printf("ready\n"); fflush(stdout);
             char command[32]; bool paste = fgets(command, sizeof(command), stdin) && strcmp(command, "paste\n") == 0;
+            NSString *insertion = nil;
+            if (paste) {
+                char *payload = NULL; size_t capacity = 0;
+                ssize_t length = getline(&payload, &capacity, stdin);
+                if (length > 0 && length < 500000) {
+                    NSData *json = [NSData dataWithBytes:payload length:(NSUInteger)length];
+                    id value = [NSJSONSerialization JSONObjectWithData:json options:NSJSONReadingFragmentsAllowed error:nil];
+                    if ([value isKindOfClass:NSString.class]) insertion = value;
+                }
+                free(payload);
+                if (!insertion.length) { CFRelease(original); CFRelease(system); fprintf(stderr, "No insertion text was supplied. Use Copy.\n"); return 79; }
+            }
             int result = 0;
             if (paste) {
                 // Let pending accessibility focus notifications settle before posting keys.
@@ -51,12 +63,24 @@ int main(int argc, const char *argv[]) {
                 }
                 if (!same) { fprintf(stderr, "The selected text field or caret changed. Copy the transcript into the intended field.\n"); result = 78; }
                 else {
+                    CFTypeRef existing = NULL;
                     Boolean settable = false;
-                    AXUIElementIsAttributeSettable((AXUIElementRef)original, kAXSelectedTextAttribute, &settable);
-                    NSString *text = [NSPasteboard.generalPasteboard stringForType:NSPasteboardTypeString];
-                    if (settable && text && AXUIElementSetAttributeValue((AXUIElementRef)original, kAXSelectedTextAttribute, (__bridge CFStringRef)text) == kAXErrorSuccess) {
-                        CFRelease(original); CFRelease(system); return 0;
+                    AXUIElementIsAttributeSettable((AXUIElementRef)original, kAXValueAttribute, &settable);
+                    if (hasRange && settable && AXUIElementCopyAttributeValue((AXUIElementRef)original, kAXValueAttribute, &existing) == kAXErrorSuccess && existing && CFGetTypeID(existing) == CFStringGetTypeID()) {
+                        NSString *value = (__bridge NSString *)existing;
+                        if (originalRange.location >= 0 && originalRange.length >= 0 && originalRange.location + originalRange.length <= value.length) {
+                            NSString *replacement = [value stringByReplacingCharactersInRange:NSMakeRange(originalRange.location, originalRange.length) withString:insertion];
+                            AXError written = AXUIElementSetAttributeValue((AXUIElementRef)original, kAXValueAttribute, (__bridge CFStringRef)replacement);
+                            CFRelease(existing); existing = NULL;
+                            if (written == kAXErrorSuccess) {
+                                CFRange caret = CFRangeMake(originalRange.location + insertion.length, 0);
+                                AXValueRef selected = AXValueCreate(kAXValueCFRangeType, &caret);
+                                AXUIElementSetAttributeValue((AXUIElementRef)original, kAXSelectedTextRangeAttribute, selected);
+                                CFRelease(selected); CFRelease(original); CFRelease(system); return 0;
+                            }
+                        }
                     }
+                    if (existing) CFRelease(existing);
                     CGEventRef down = CGEventCreateKeyboardEvent(NULL, 9, true), up = CGEventCreateKeyboardEvent(NULL, 9, false);
                     if (!down || !up) result = 79;
                     else { CGEventSetFlags(down, kCGEventFlagMaskCommand); CGEventSetFlags(up, kCGEventFlagMaskCommand); CGEventPostToPid(originalPid, down); CGEventPostToPid(originalPid, up); }

@@ -41,7 +41,7 @@ class EncryptedTokenStore {
     await fs.writeFile(`${destination}.tmp`, await this.crypto.encryptStringAsync(JSON.stringify(value)), {mode: 0o600});
     await fs.rename(`${destination}.tmp`, destination);
   }); }
-  remove(provider) { return this.serialize(provider, () => fs.rm(path.join(this.directory, `${provider}.bin`), {force: true})); }
+  remove(provider) { return this.serialize(provider, async () => { for (const suffix of ['.bin', '.bin.tmp']) await fs.rm(path.join(this.directory, `${provider}${suffix}`), {force: true}); }); }
 }
 
 class Connections {

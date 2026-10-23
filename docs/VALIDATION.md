@@ -21,8 +21,21 @@ from external account, platform and distribution qualification.
   in the normal MatiQ Voice model directory. Hardware recommendation is a RAM/
   CPU heuristic, not an accuracy or performance benchmark.
 
-Native text-field checks and final installer/CI results are recorded below as
-qualification progresses. Posting a shortcut alone is never delivery proof.
+- Native macOS text-field E2E passes actual insertion, Unicode selection
+  replacement and rejection after switching to a different field. This tests
+  Accessibility insertion into the fixture's textareas; other apps, rich text
+  and keyboard fallback still require qualification.
+- The arm64 Mac development DMG builds with the approved MatiQ icon. The
+  packaged app passes speech recognition and native ONNX speaker inference
+  in an isolated profile. Ad-hoc `codesign --verify --deep --strict` passes.
+- Recommended Medium English recognition passes a known speech fixture.
+- GitHub attempted both Mac and Windows CI jobs but did not start them:
+  organization payments/spending limits blocked Actions. Neither remote job
+  is a passed build. See [PR #1](https://github.com/GoMatiQ-inc/matiq-voice/pull/1)
+  for the account billing annotation.
+
+Posting a shortcut alone is never delivery proof. The default dictation
+shortcut is Cmd Shift Space / Ctrl Shift Space; failed registration is visible.
 
 ## Reproduce
 
@@ -35,6 +48,7 @@ npm run engine:build
 npm run test:e2e
 npm run test:focus
 npm run package
+npm run test:packaged
 ```
 
 Use the machine's storage guard on shared development hosts. E2E downloads

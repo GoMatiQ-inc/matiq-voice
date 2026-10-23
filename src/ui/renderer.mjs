@@ -111,7 +111,7 @@ function renderSetup() {
     $('setup-copy-only').onchange = async event => { $('autoPaste').checked = !event.target.checked; await savePreferences(); renderSetup(); };
     $('setup-next').disabled ||= snapshot.settings.autoPaste && !snapshot.permissions.accessibility;
   } else if (setupStep === 4) { content.innerHTML = '<div id="setup-connections"></div><p class="caption">Connections are optional. Local recording works without calendar access. Connecting a calendar does not create an independently joining meeting bot.</p>'; renderConnections($('setup-connections')); }
-  else content.innerHTML = `<ul class="setup-step-list"><li>English speech model <small>${escape(snapshot.settings.model)} installed and verified</small></li><li>Speaker labels <small>Local segmentation and English speaker-embedding models installed</small></li><li>Microphone <small>Audio input tested</small></li><li>Background dictation <small>${snapshot.platform === 'darwin' ? '⌘ Option Space' : 'Ctrl Alt Space'} starts and stops dictation</small></li></ul><p class="caption">Meeting audio is saved locally only when you explicitly start recording. Recognition and speaker labels can still contain errors.</p>`;
+  else content.innerHTML = `<ul class="setup-step-list"><li>English speech model <small>${escape(snapshot.settings.model)} installed and verified</small></li><li>Speaker labels <small>Local segmentation and English speaker-embedding models installed</small></li><li>Microphone <small>Audio input tested</small></li><li>Background dictation <small>${snapshot.platform === 'darwin' ? '⌘ Shift Space' : 'Ctrl Shift Space'} starts and stops dictation</small></li></ul><p class="caption">Meeting audio is saved locally only when you explicitly start recording. Recognition and speaker labels can still contain errors.</p>`;
 }
 $('setup-next').onclick = async () => { try { if (setupStep === 5) { await api.completeSetup(); await refresh(); $('setup-dialog').close(); message('Setup complete. Start dictation from any text field with your shortcut.'); } else { setupStep++; renderSetup(); } } catch (error) { setupError(error); } };
 $('setup-back').onclick = () => { if (!setupBusy && setupStep > 0) { setupStep--; renderSetup(); } };
@@ -218,14 +218,14 @@ $('meeting-start').onclick = async () => {
 async function pauseMeeting() {
   const paused = state !== 'meeting-paused'; await Promise.all(captures.map(capture => capture.pause(paused))); await api.pauseMeeting(paused); await refresh(); renderMeeting();
 }
-async function stopMeeting(problem = null) {
+async function stopMeeting(problem = null, processSaved = true) {
   if (meetingStopping || !snapshot?.activeMeeting || state === 'meeting-processing') return;
   meetingStopping = true; captureGeneration++; const id = snapshot.activeMeeting;
   try {
     const results = await Promise.allSettled(captures.map(capture => capture.stop())); captures = [];
     const failed = results.find(result => result.status === 'rejected'); if (failed) problem ||= failed.reason;
     selectedMeeting = await api.stopMeeting(id, problem?.message || ''); await refresh(); await loadMeetings(); renderMeeting();
-    if (problem) showError(problem); else if (selectedMeeting.chunks.length) await processMeeting(id);
+    if (problem) showError(problem); else if (processSaved && selectedMeeting.chunks.length) await processMeeting(id);
   } finally { meetingStopping = false; }
 }
 async function processMeeting(id) {
@@ -254,7 +254,7 @@ api.onEvent(event => {
   if (event.type === 'transcript') { $('transcript').value = event.text; paint(); }
   if (event.type === 'navigate') navigate(event.page);
   if (event.type === 'stop-meeting') stopMeeting().catch(showError);
-  if (event.type === 'quit-after-meeting') stopMeeting().then(() => api.quit()).catch(showError);
+  if (event.type === 'quit-after-meeting') stopMeeting(null, false).then(() => api.quit()).catch(showError);
   if (event.type === 'connections') { snapshot.connections = event.connections; renderConnections($('connections')); }
   if (event.type === 'download') { $('status').textContent = `Installing ${event.file} · ${event.percent}%`; if ($('setup-download-progress')) $('setup-download-progress').value = event.overall; if ($('setup-download-label')) $('setup-download-label').textContent = `${event.file} · ${event.percent}%`; }
 });
@@ -275,7 +275,7 @@ try {
   await refresh();
   for (const [id, model] of Object.entries(snapshot.models)) $('model').add(new Option(model.label, id));
   $('model').value = snapshot.settings.model; $('autoPaste').checked = snapshot.settings.autoPaste; $('launch-login').checked = snapshot.setup.launchAtLogin;
-  $('transcript').value = snapshot.lastTranscript; $('shortcut').textContent = snapshot.platform === 'darwin' ? '⌘ Option Space' : 'Ctrl Alt Space';
+  $('transcript').value = snapshot.lastTranscript; $('shortcut').textContent = snapshot.platform === 'darwin' ? '⌘ Shift Space' : 'Ctrl Shift Space';
   await microphones(); paint();
   if (snapshot.startupNotice) message(snapshot.startupNotice);
   if (!snapshot.shortcutReady) message('The global shortcut is unavailable. Close another app using it and restart MatiQ Voice.');

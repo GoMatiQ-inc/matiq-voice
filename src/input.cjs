@@ -21,7 +21,7 @@ function captureTarget(executable, args) {
       clearTimeout(timeout);
       timeout = setTimeout(() => { child.kill(); pasteReject?.(new Error('Destination tracking expired. Copy the transcript manually.')); }, 20 * 60000);
       resolve({
-        paste() { return new Promise((done, fail) => { if (terminal) { fail(new Error('Destination tracking ended. Use Copy.')); return; } pasteResolve = done; pasteReject = fail; child.stdin.end('paste\n'); }); },
+        paste(text) { return new Promise((done, fail) => { if (terminal) { fail(new Error('Destination tracking ended. Use Copy.')); return; } pasteResolve = done; pasteReject = fail; child.stdin.end('paste\n' + (process.platform === 'darwin' ? JSON.stringify(text) + '\n' : '')); }); },
         cancel() { if (!terminal) child.stdin.end('cancel\n'); }
       });
     });

@@ -16,10 +16,10 @@ Install the app for your OS/architecture and follow first-run setup:
 4. Optionally connect Microsoft or Google through the system browser.
 5. Finish setup. No terminal, Python, Node or package installation is needed.
 
-**⌘ Option Space** on Mac / **Ctrl Alt Space** on Windows starts and stops
+**⌘ Shift Space** on Mac / **Ctrl Shift Space** on Windows starts and stops
 background dictation. Wait for Listening. The HUD leaves the original field
 focused. Closing the main window hides it; use the menu-bar/system-tray menu to
-open it or Quit. The original field is checked again before sending paste;
+open it or Quit. The original field is checked again before inserting text;
 unsupported/changed destinations leave a recoverable transcript to copy.
 There is no word-removal or rewriting stage. Recognition itself can err.
 
@@ -81,7 +81,8 @@ isolated app/browser profiles, and removes temporary profiles afterward.
 Models/native inference and OS-protected credential files are real; provider
 consent pages and capture devices are local fixtures. Tests never join a real
 meeting or record the user's screen/system audio. Copy tests use the system
-clipboard. CI builds and runs these checks separately on Mac and Windows.
+clipboard. CI is configured to build and run these checks separately on Mac and Windows;
+current account-level execution blockers are recorded in VALIDATION.md.
 
 The default package is a development build: ad-hoc Mac signing / unsigned
 Windows packaging. Customer release commands fail without real registrations
@@ -98,6 +99,8 @@ are external platform steps, not claims an automated fixture can prove.
 - `src/input.cjs`, `native/`: focused-field tracking and paste helpers.
 - `src/ui/`: MatiQ-branded working UI, onboarding and capture.
 - `scripts/e2e.mjs`: full app regression journeys with explicit fixtures.
+- `scripts/e2e-packaged.mjs`: real inference from the packaged native runtime.
+- `scripts/e2e-focus.mjs`: native insertion and destination-change checks.
 
 The source checkout retains its original `verbatim-dictation` folder name;
 the distributed product and private GitHub repository are MatiQ Voice.

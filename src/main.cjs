@@ -125,7 +125,7 @@ async function start(options) {
       if (controller.signal.aborted) return;
       lastTranscript = text; lastAudio = null; send({type: 'transcript', text}); updateTray();
       if (!text) { notice('The recognizer returned no words. Try closer to the microphone.'); return; }
-      if (settings.autoPaste && target) { clipboard.writeText(text); try { await target.paste(); notice('Paste shortcut sent. Your transcript remains available to copy.'); } catch (error) { notice(`Text is ready, but paste failed: ${error.message}`); } }
+      if (settings.autoPaste && target) { clipboard.writeText(text); try { await target.paste(text); notice('Text insertion requested. Your transcript remains available to copy.'); } catch (error) { notice(`Text is ready, but paste failed: ${error.message}`); } }
       else notice('Transcript ready. Copy it into the text field you want.');
     } catch (error) { if (!controller.signal.aborted) { notice(`Recognition failed: ${error.message} Use Retry; your audio is retained in memory.`); throw error; } }
     finally { operation = null; target?.cancel(); target = null; setState('idle'); }
@@ -228,8 +228,8 @@ async function start(options) {
   });
   handle('quit', () => { quitting = true; app.quit(); });
   await hud.loadURL(hudURL); await win.loadURL(pageURL);
-  shortcutReady = globalShortcut.register('CommandOrControl+Alt+Space', () => send({type: 'toggle'}));
-  if (!globalShortcut.register('CommandOrControl+Alt+Escape', () => send({type: 'cancel'}))) startupNotice += ' The cancel shortcut is unavailable. Use the app controls.';
+  shortcutReady = globalShortcut.register('CommandOrControl+Shift+Space', () => send({type: 'toggle'}));
+  if (!globalShortcut.register('CommandOrControl+Alt+Backspace', () => send({type: 'cancel'}))) startupNotice += ' The cancel shortcut is unavailable. Use the app controls.';
   show();
 }
 if (require.main === module) launch();
