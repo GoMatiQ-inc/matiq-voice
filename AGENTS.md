@@ -1,19 +1,24 @@
-# Working on Verbatim
+# Working on MatiQ Voice
 
-Read README.md and docs/PRODUCT.md before changing behavior.
+Read README.md, docs/PRODUCT.md and docs/OAUTH.md before changing behavior.
 
-- This is standalone desktop dictation, not a MatiQ platform feature.
-- Never add rewriting, word removal, dictionary replacements, or translation
-  to the transcription path. Preserve the recognizer's words.
-- No audio/transcript network requests. Model downloads must be explicit and
-  verified. No transcript logging or silent persistence.
-- Report errors with a recovery action. Never report a paste as delivered text:
-  sending an OS shortcut does not prove the destination accepted it.
-- Keep recognition out of the renderer. Keep the renderer sandboxed and IPC
-  narrow. Avoid runtime dependencies that require users to compile software.
-- Run npm test for core changes and npm run test:desktop for UI/lifecycle
-  changes. Build and smoke-test packaged apps on their target OS/architecture.
-- Maintain docs/VALIDATION.md. Do not equate unit tests with speech accuracy,
-  Windows validation, signing, or daily-use reliability.
-- Respect inherited storage-guard and worktree-lifecycle rules on shared
-  development machines. Keep generated dependencies and builds out of Git.
+- Standalone desktop software, not a platform feature or a new platform layer.
+- Preserve recognized words. No dictation rewrite, filler deletion, automatic
+  replacements or translation. Keep meeting notes separate and source-linked.
+- Audio/transcripts never leave the device. Explicit OAuth/calendar metadata
+  and model downloads are allowed. Meeting storage requires explicit user
+  intent; never introduce silent dictation history or transcript logging.
+- Customers do not configure OAuth IDs or developer packages. Registrations
+  belong to the build owner; tokens stay in the main process, encrypted with OS
+  crypto. Never fall back to plaintext or expose tokens to renderer/logs.
+- Keep the renderer sandboxed, IPC narrow and checked, native inference in an
+  isolated process. Use JavaScript-owned PCM buffers: native external-buffer
+  WAV helpers are incompatible with Electron's V8 memory cage.
+- Capture failures must be visible and retained audio must remain retryable.
+  Posting a paste shortcut does not verify delivery. Track the original field.
+- Test with npm test and npm run test:e2e. Native field/capture permissions,
+  provider consent, real meetings and production signing remain separate gates.
+- Update docs/VALIDATION.md with actual results and limitations. Never equate
+  fixture-provider tests with live Google/Microsoft account qualification.
+- Follow inherited storage-guard and worktree rules. No generated dependencies,
+  binaries, private registration config or model files in Git.

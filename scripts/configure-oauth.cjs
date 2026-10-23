@@ -1,0 +1,10 @@
+const fs = require('node:fs');
+const path = require('node:path');
+const filename = path.join(__dirname, '..', 'config', 'oauth.json');
+const config = fs.existsSync(filename) ? JSON.parse(fs.readFileSync(filename, 'utf8')) : {};
+if (process.env.MATIQ_MICROSOFT_CLIENT_ID) config.microsoft = {clientId: process.env.MATIQ_MICROSOFT_CLIENT_ID};
+if (process.env.MATIQ_GOOGLE_CLIENT_ID) config.google = {clientId: process.env.MATIQ_GOOGLE_CLIENT_ID, desktopClientSecret: process.env.MATIQ_GOOGLE_DESKTOP_CLIENT_SECRET || ''};
+if (!Object.keys(config).length) throw new Error('Provide the MatiQ OAuth registration IDs via MATIQ_MICROSOFT_CLIENT_ID and/or MATIQ_GOOGLE_CLIENT_ID. See docs/OAUTH.md.');
+const directory = path.join(__dirname, '..', 'config'); fs.mkdirSync(directory, {recursive: true});
+fs.writeFileSync(path.join(directory, 'oauth.json'), JSON.stringify(config, null, 2), {mode: 0o600});
+console.log('OAuth build configuration written. No credential values are printed.');

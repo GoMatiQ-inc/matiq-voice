@@ -25,13 +25,13 @@ await writeFile(path.join(build, 'source.tar.gz'), archive);
 run('tar', ['-xzf', path.join(build, 'source.tar.gz'), '-C', build]);
 run('cmake', ['-S', source, '-B', path.join(build, 'output'), '-DCMAKE_BUILD_TYPE=Release',
   '-DBUILD_SHARED_LIBS=OFF', '-DGGML_NATIVE=OFF', '-DWHISPER_BUILD_TESTS=OFF', '-DWHISPER_BUILD_SERVER=OFF',
-  '-DGGML_METAL_EMBED_LIBRARY=ON', ...(process.platform === 'win32' ? ['-DGGML_OPENMP=OFF', '-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded$<$<CONFIG:Debug>:Debug>'] : ['-DCMAKE_OSX_DEPLOYMENT_TARGET=14.0'])]);
+  '-DGGML_METAL_EMBED_LIBRARY=ON', ...(process.platform === 'win32' ? ['-DGGML_OPENMP=OFF', '-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded$<$<CONFIG:Debug>:Debug>'] : ['-DCMAKE_OSX_DEPLOYMENT_TARGET=14.2'])]);
 run('cmake', ['--build', path.join(build, 'output'), '--config', 'Release', '--target', 'whisper-cli', '--parallel', '4']);
 const windows = process.platform === 'win32';
 const filename = windows ? 'whisper-cli.exe' : 'whisper-cli';
 await copyFile(path.join(build, 'output', 'bin', ...(windows ? ['Release'] : []), filename), path.join(destination, filename));
 await copyFile(path.join(source, 'LICENSE'), path.join(destination, 'WHISPER-LICENSE'));
-if (process.platform === 'darwin') run('clang', ['-O2', '-mmacosx-version-min=14.0', '-framework', 'Cocoa', '-framework', 'ApplicationServices', path.join(root, 'native', 'mac-input.m'), '-o', path.join(destination, 'mac-input')]);
-await writeFile(path.join(destination, 'build.json'), JSON.stringify({engine: 'whisper.cpp', commit, version: '1.9.5', platform: process.platform, arch: process.arch, sourceSha256: createHash('sha256').update(archive).digest('hex')}, null, 2));
+if (process.platform === 'darwin') run('clang', ['-O2', '-mmacosx-version-min=14.2', '-framework', 'Cocoa', '-framework', 'ApplicationServices', path.join(root, 'native', 'mac-input.m'), '-o', path.join(destination, 'mac-input')]);
+await writeFile(path.join(destination, 'build.json'), JSON.stringify({engine: 'whisper.cpp', nativeInputVersion: 2, commit, version: '1.9.5', platform: process.platform, arch: process.arch, sourceSha256: createHash('sha256').update(archive).digest('hex')}, null, 2));
 await rm(build, {recursive: true, force: true});
 console.log(`Engine ready for ${process.platform}/${process.arch}. Source/build output removed.`);

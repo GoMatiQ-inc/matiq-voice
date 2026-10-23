@@ -1,4 +1,4 @@
-param([ValidateSet('capture', 'paste')][string]$Action, [long]$TargetWindow = 0)
+param([ValidateSet('capture', 'paste', 'session')][string]$Action, [long]$TargetWindow = 0)
 $ErrorActionPreference = 'Stop'
 Add-Type @'
 using System;
@@ -30,6 +30,26 @@ public static class VerbatimInput {
   }
 }
 '@
+if ($Action -eq 'session') {
+  Add-Type -AssemblyName UIAutomationClient
+  Add-Type -AssemblyName UIAutomationTypes
+  $original = [System.Windows.Automation.AutomationElement]::FocusedElement
+  if ($null -eq $original -or $original.Current.IsPassword) { throw 'This field cannot be tracked safely. Use Copy.' }
+  $originalId = $original.GetRuntimeId() -join ':'
+  $window = [VerbatimInput]::GetForegroundWindow().ToInt64()
+  Write-Output 'ready'
+  $command = [Console]::ReadLine()
+  if ($command -ne 'paste') { exit 0 }
+  $current = [System.Windows.Automation.AutomationElement]::FocusedElement
+  if ($null -eq $current -or ($current.GetRuntimeId() -join ':') -ne $originalId -or [VerbatimInput]::GetForegroundWindow().ToInt64() -ne $window) {
+    throw 'The selected text field changed. Copy the transcript into the intended field.'
+  }
+  foreach ($key in @(0x10, 0x11, 0x12, 0x5B, 0x5C)) {
+    if (([VerbatimInput]::GetAsyncKeyState($key) -band 0x8000) -ne 0) { throw 'Release modifier keys and paste the transcript manually.' }
+  }
+  [VerbatimInput]::Paste()
+  exit 0
+}
 if ($Action -eq 'capture') { [VerbatimInput]::GetForegroundWindow().ToInt64(); exit 0 }
 if ($TargetWindow -le 0 -or [VerbatimInput]::GetForegroundWindow().ToInt64() -ne $TargetWindow) {
   throw 'The active window changed. Copy your transcript and paste it into the intended field.'

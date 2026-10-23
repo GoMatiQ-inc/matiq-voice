@@ -8,6 +8,10 @@ module.exports = async context => {
   if (metadata.platform !== platform || metadata.arch !== arch) {
     throw new Error(`Engine is ${metadata.platform}/${metadata.arch}, but app is ${platform}/${arch}. Build the engine on the matching runner first.`);
   }
+  if (metadata.nativeInputVersion !== 2) throw new Error('Rebuild the native input helper before packaging.');
+  const nativePackage = `sherpa-onnx-${platform === 'win32' ? 'win' : platform}-${arch}`;
+  const nativeRoot = path.dirname(require.resolve(`${nativePackage}/package.json`));
+  if (!fs.readdirSync(nativeRoot, {recursive: true}).some(file => String(file).endsWith('.node'))) throw new Error(`Missing ${nativePackage} inference addon. Reinstall dependencies on the matching runner.`);
   for (const filename of [platform === 'win32' ? 'whisper-cli.exe' : 'whisper-cli', 'WHISPER-LICENSE', ...(platform === 'darwin' ? ['mac-input'] : [])]) {
     if (!fs.existsSync(path.join(directory, filename))) throw new Error(`Missing ${filename}. Run npm run engine:build before packaging.`);
   }

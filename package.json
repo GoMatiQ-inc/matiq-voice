@@ -1,18 +1,22 @@
 {
-  "name": "verbatim-dictation",
-  "productName": "Verbatim",
-  "version": "0.1.0",
+  "name": "matiq-voice",
+  "productName": "MatiQ Voice",
+  "version": "0.2.0",
   "private": true,
-  "description": "Local dictation for macOS and Windows, without rewriting.",
-  "author": "Verbatim contributors",
+  "description": "Private English dictation and meeting notes by MatiQ.",
+  "author": "MatiQ Inc",
   "main": "src/main.cjs",
   "scripts": {
     "start": "electron .",
     "test": "node --test",
-    "test:desktop": "node scripts/smoke-desktop.mjs",
+    "test:desktop": "node scripts/e2e.mjs",
     "engine:build": "node scripts/build-engine.mjs",
     "package": "electron-builder --publish never",
-    "package:dir": "electron-builder --dir --publish never"
+    "package:dir": "electron-builder --dir --publish never",
+    "test:e2e": "node scripts/e2e.mjs",
+    "oauth:configure": "node scripts/configure-oauth.cjs",
+    "package:release": "node scripts/release.cjs",
+    "test:focus": "node scripts/e2e-focus.mjs"
   },
   "devDependencies": {
     "electron": "45.0.0",
@@ -20,11 +24,12 @@
     "playwright": "1.64.1"
   },
   "build": {
-    "appId": "app.verbatim.dictation",
+    "appId": "com.matiq.voice",
     "asar": true,
     "files": [
       "src/**/*",
-      "package.json"
+      "package.json",
+      "config/oauth.json"
     ],
     "extraResources": [
       {
@@ -41,7 +46,7 @@
       "output": "dist"
     },
     "mac": {
-      "minimumSystemVersion": "14.0",
+      "minimumSystemVersion": "14.2",
       "identity": "-",
       "category": "public.app-category.productivity",
       "target": [
@@ -52,7 +57,9 @@
       "entitlements": "native/entitlements.mac.plist",
       "entitlementsInherit": "native/entitlements.mac.plist",
       "extendInfo": {
-        "NSMicrophoneUsageDescription": "Verbatim records your voice only when you start dictation. Speech recognition runs on this Mac."
+        "NSMicrophoneUsageDescription": "MatiQ Voice records speech when you start dictation or a meeting. Recognition runs on this device.",
+        "NSAudioCaptureUsageDescription": "MatiQ Voice captures meeting audio from this computer only when you start meeting recording.",
+        "NSScreenCaptureUsageDescription": "Choose the meeting screen to capture its audio. MatiQ Voice does not save screen video."
       }
     },
     "win": {
@@ -64,6 +71,16 @@
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true
-    }
+    },
+    "asarUnpack": [
+      "node_modules/**/*.node",
+      "node_modules/**/*.dylib",
+      "node_modules/**/*.dll",
+      "node_modules/**/*.so*"
+    ],
+    "icon": "src/ui/assets/app-icon.png"
+  },
+  "dependencies": {
+    "sherpa-onnx-node": "2.0.0"
   }
 }
