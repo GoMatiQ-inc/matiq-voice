@@ -50,4 +50,11 @@ try {
   const result = {packaged:true, platform:process.platform, arch:process.arch, shortcutRegistered:(await page.evaluate(() => window.matiqVoice.status())).shortcutReady, checks:['isolated profile','bundled speech recognition','bundled ONNX speaker inference'], limitations:['Public audio fixtures; no real meeting or OS capture permissions tested.']};
   await fs.writeFile(path.join(fixtures,'packaged-results.json'),JSON.stringify(result,null,2));
   console.log(JSON.stringify(result,null,2));
-} finally { await app?.close(); await fs.rm(profile,{recursive:true,force:true}); }
+} finally {
+  if (app && app.process().exitCode === null) {
+    const closed = app.waitForEvent('close', {timeout: 10000});
+    await app.evaluate(({app}) => { setTimeout(() => app.quit(), 50); });
+    await closed;
+  }
+  await fs.rm(profile,{recursive:true,force:true});
+}
