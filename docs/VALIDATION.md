@@ -1,6 +1,6 @@
 # Validation
 
-Checked 2026-10-23 on Apple Silicon. This file distinguishes implemented behavior
+Checked 2026-10-24 on Apple Silicon. This file distinguishes implemented behavior
 from external account, platform and distribution qualification.
 
 ## Local checks
@@ -70,13 +70,22 @@ access still need a real consenting user.
 
 Builds inject registration metadata from the configured repository variables /
 secret into ignored `config/oauth.json`. Packaged E2E now checks that configured
-providers survive packaging. Google registration is awaiting sign-in to the
-company's designated management account; no Google client ID is fabricated.
+providers survive packaging. The Google Desktop registration now exists in
+MatiQ's dedicated company project, with an External / Testing audience, a
+designated test account, company homepage/domain and identity plus read-only
+calendar-event scopes. The installed app reaches Google's real account consent
+screen. Calendar API activation awaits acceptance of its separate terms;
+authenticated token exchange and calendar access remain unqualified.
+
+Both real registrations are included in the rebuilt Apple Silicon development
+installer. The 21 unit tests, ten app E2E journeys and packaged native-inference /
+registration checks pass again with this build. No account consent result is
+inferred from those fixture tests.
 
 ## External release gates
 
-- Actual Google Desktop OAuth and multi-tenant Microsoft public-client
-  registrations, consent/verification and real accounts need qualification.
+- Google Desktop OAuth and multi-tenant Microsoft public-client registrations
+  exist; consent/verification and real accounts still need qualification.
   This source contains no fabricated production client IDs. See OAUTH.md.
 - A real user-attended Teams and Google Meet call, actual system-audio capture,
   microphone permissions and participant-label accuracy require live testing.
