@@ -25,6 +25,13 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci --no-audit --no-fund
+      - name: Configure installed-app OAuth registrations
+        if: vars.MATIQ_MICROSOFT_CLIENT_ID != '' || vars.MATIQ_GOOGLE_CLIENT_ID != ''
+        run: npm run oauth:configure
+        env:
+          MATIQ_MICROSOFT_CLIENT_ID: ${{ vars.MATIQ_MICROSOFT_CLIENT_ID }}
+          MATIQ_GOOGLE_CLIENT_ID: ${{ vars.MATIQ_GOOGLE_CLIENT_ID }}
+          MATIQ_GOOGLE_DESKTOP_CLIENT_SECRET: ${{ secrets.MATIQ_GOOGLE_DESKTOP_CLIENT_SECRET }}
       - run: npm test
       - run: npm run engine:build
       - run: npm run test:e2e

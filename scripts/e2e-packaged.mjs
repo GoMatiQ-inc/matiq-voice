@@ -30,6 +30,12 @@ try {
   await expect.poll(() => app.windows().some(page => page.url().endsWith('/index.html')), {timeout: 15000}).toBe(true);
   const page = app.windows().find(page => page.url().endsWith('/index.html'));
   await page.locator('#model option').first().waitFor({state: 'attached'});
+  let registrations = {};
+  try { registrations = JSON.parse(await fs.readFile(path.join(root, 'config/oauth.json'), 'utf8')); }
+  catch (error) { if (error.code !== 'ENOENT') throw error; }
+  const installedStatus = await page.evaluate(() => window.matiqVoice.status());
+  for (const provider of ['microsoft', 'google']) assert.equal(installedStatus.connections[provider].configured, Boolean(registrations[provider]?.clientId), `${provider} registration must survive packaging`);
+
   const speech = wavBytes(await fs.readFile(path.join(fixtures, 'jfk.wav')));
   await page.evaluate(async bytes => {
     const api = window.matiqVoice;
@@ -47,7 +53,7 @@ try {
   }, audio);
   assert.equal(meeting.status,'ready'); assert.ok(meeting.segments.length > 0);
   assert.ok(Object.keys(meeting.speakers).filter(id=>id.startsWith('remote-')).length >= 2);
-  const result = {packaged:true, platform:process.platform, arch:process.arch, shortcutRegistered:(await page.evaluate(() => window.matiqVoice.status())).shortcutReady, checks:['isolated profile','bundled speech recognition','bundled ONNX speaker inference'], limitations:['Public audio fixtures; no real meeting or OS capture permissions tested.']};
+  const result = {packaged:true, platform:process.platform, arch:process.arch, shortcutRegistered:(await page.evaluate(() => window.matiqVoice.status())).shortcutReady, checks:['isolated profile','bundled speech recognition','bundled ONNX speaker inference','OAuth registration configuration'], limitations:['Public audio fixtures; no real meeting or OS capture permissions tested.']};
   await fs.writeFile(path.join(fixtures,'packaged-results.json'),JSON.stringify(result,null,2));
   console.log(JSON.stringify(result,null,2));
 } finally {

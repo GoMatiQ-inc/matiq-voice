@@ -62,6 +62,12 @@ The command writes ignored `config/oauth.json` without printing values. That
 file is included in the installed app. The account screen contains no client-ID
 inputs or endpoint configuration. Missing configuration produces an explicit
 connection-unavailable error; it never displays a fictitious connected account.
+CI reads public client IDs from repository variables with the same environment
+variable names. The optional Google Desktop registration secret is supplied
+through a repository secret. These values are injected into the ignored build
+configuration before packaging; a fork without registration variables still
+builds an explicitly unconfigured development app.
+
 Tokens, refresh tokens, authorization codes and PKCE verifiers are never put in
 source, renderer state, logs, URLs sent to the renderer, or public app settings.
 The loopback callback validates state and does not reflect codes into HTML.

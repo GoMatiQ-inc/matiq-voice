@@ -59,6 +59,20 @@ only their own text fields, verify insertion, and reject a changed destination.
 They temporarily use the text clipboard and restore its prior text contents;
 non-text clipboard formats are not preserved.
 
+## OAuth registration follow-up
+
+The real Microsoft public/native registration now exists in MatiQ's tenant,
+with organizational multi-tenant sign-in, the loopback redirect, approved MatiQ
+artwork and delegated read-only calendar/profile scopes. Its production
+authorization endpoint accepts the desktop PKCE request. No user or tenant-wide
+calendar consent was granted during setup; authenticated sign-in and calendar
+access still need a real consenting user.
+
+Builds inject registration metadata from the configured repository variables /
+secret into ignored `config/oauth.json`. Packaged E2E now checks that configured
+providers survive packaging. Google registration is awaiting sign-in to the
+company's designated management account; no Google client ID is fabricated.
+
 ## External release gates
 
 - Actual Google Desktop OAuth and multi-tenant Microsoft public-client
