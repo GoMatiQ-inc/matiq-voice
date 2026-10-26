@@ -23,6 +23,12 @@ app. Closing hides the app; menu bar/system tray controls remain alive.
 
 ## Dictation
 
+Settings allow a custom global toggle shortcut using modifier keys plus a
+letter, number, function key or listed punctuation key. One press starts and a
+second press stops. This is not hold-to-talk. Changes take effect immediately
+and persist; conflicts keep the old binding. macOS Command Space and Control
+Space are rejected to avoid search/input-switching shortcuts.
+
 The global shortcut starts a nonactivating HUD. Listening appears after the
 capture graph is ready. All audio samples through the final acknowledgement
 are retained; dictation is bounded at five minutes. The native input helper

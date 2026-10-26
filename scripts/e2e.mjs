@@ -125,6 +125,32 @@ try {
     for (const provider of ['microsoft', 'google']) { const encrypted = await fs.readFile(path.join(profile, 'credentials', `${provider}.bin`)); assert.equal(encrypted.includes(Buffer.from('fixture-access-')), false); }
     await page.locator('#setup-next').click(); await page.locator('#setup-next').click(); await expect(page.locator('#setup-dialog')).not.toBeVisible();
   });
+  await scenario('custom shortcut registers, rejects conflicts and restores the previous binding', async () => {
+    await page.getByRole('button', {name: 'Settings', exact: true}).click();
+    for (const input of await page.locator('#shortcut-modifiers input').all()) await input.evaluate(element => { element.checked = false; });
+    await page.locator('#shortcut-control').check(); await page.locator('#shortcut-alt').check(); await page.locator('#shortcut-shift').check(); await page.locator('#shortcut-key').selectOption('J');
+    const previous = (await page.evaluate(() => window.matiqVoice.status())).settings.shortcut;
+    await page.locator('#shortcut-save').click(); await expect(page.locator('#shortcut-status')).toContainText('Active:');
+    assert.equal((await page.evaluate(() => window.matiqVoice.status())).settings.shortcut, 'Control+Alt+Shift+J');
+    assert.equal(await desktop.evaluate(({globalShortcut}) => globalShortcut.isRegistered('Control+Alt+Shift+J')), true);
+    await page.screenshot({path: path.join(fixtures, 'shortcut-settings.png'), fullPage: true});
+    assert.equal(await desktop.evaluate(({globalShortcut}, old) => globalShortcut.isRegistered(old), previous), false);
+    assert.equal(await desktop.evaluate(({globalShortcut}) => globalShortcut.register('Control+Alt+Shift+L', () => {})), true);
+    await page.locator('#shortcut-key').selectOption('L'); await page.locator('#shortcut-save').click();
+    await expect(page.locator('#shortcut-status')).toContainText('unavailable');
+    assert.equal((await page.evaluate(() => window.matiqVoice.status())).settings.shortcut, 'Control+Alt+Shift+J');
+    assert.equal(await desktop.evaluate(({globalShortcut}) => globalShortcut.isRegistered('Control+Alt+Shift+J')), true);
+    await desktop.evaluate(({globalShortcut}) => globalShortcut.unregister('Control+Alt+Shift+L'));
+    await fs.mkdir(path.join(profile, 'settings.json.tmp'));
+    try {
+      await page.locator('#shortcut-key').selectOption('K'); await page.locator('#shortcut-save').click();
+      await expect(page.locator('#shortcut-status')).toContainText('EISDIR');
+      assert.equal((await page.evaluate(() => window.matiqVoice.status())).settings.shortcut, 'Control+Alt+Shift+J');
+      assert.equal(await desktop.evaluate(({globalShortcut}) => globalShortcut.isRegistered('Control+Alt+Shift+K')), false);
+      assert.equal(await desktop.evaluate(({globalShortcut}) => globalShortcut.isRegistered('Control+Alt+Shift+J')), true);
+    } finally { await fs.rm(path.join(profile, 'settings.json.tmp'), {recursive: true}); }
+    await page.getByRole('button', {name: 'Dictation', exact: true}).click();
+  });
   await scenario('verbatim recognition and copy use the bundled real speech engine', async () => {
     const wav = canonicalWav(await fs.readFile(path.join(fixtures, 'jfk.wav')));
     await page.evaluate(async bytes => { await window.matiqVoice.begin(); await window.matiqVoice.recordingReady(); await window.matiqVoice.transcribe(new Uint8Array(bytes)); }, wav);
@@ -163,6 +189,8 @@ try {
     assert.equal(await desktop.evaluate(({BrowserWindow}) => BrowserWindow.getAllWindows().find(window => window.getTitle() === 'MatiQ Voice').isVisible()), false);
     await desktop.close(); desktop = null; page = await boot(); await expect(page.locator('#setup-dialog')).not.toBeVisible();
     assert.equal((await page.evaluate(() => window.matiqVoice.status())).connections.google.connected, true);
+    assert.equal((await page.evaluate(() => window.matiqVoice.status())).settings.shortcut, 'Control+Alt+Shift+J');
+    assert.equal(await desktop.evaluate(({globalShortcut}) => globalShortcut.isRegistered('Control+Alt+Shift+J')), true);
     await page.getByRole('button', {name: 'Meetings', exact: true}).click(); await page.locator('.meeting-item').filter({hasText: 'English speaker E2E'}).click(); await expect(page.locator('#speaker-remote-0')).toHaveValue('Alex');
     await page.getByRole('button', {name: 'Notes', exact: true}).click(); await expect(page.locator('#personal-notes')).toHaveValue('E2E personal note retained locally.');
     await page.screenshot({path: path.join(fixtures, 'matiq-voice-e2e.png'), fullPage: true});

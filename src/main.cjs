@@ -40,7 +40,7 @@ async function start(options) {
   const connections = new Connections({config: oauthConfig, store: new EncryptedTokenStore(path.join(dataDir, 'credentials'), options.crypto || safeStorage), openBrowser: options.openBrowser || (url => shell.openExternal(url)), fetchImpl: options.fetchImpl || fetch, testEndpoints: options.testEndpoints || null});
   const meetings = new MeetingStore(path.join(dataDir, 'meetings')); await meetings.recover();
   await fs.rm(jobsDir, {recursive: true, force: true}); await fs.mkdir(jobsDir, {recursive: true, mode: 0o700});
-  let state = 'idle', lastTranscript = '', lastAudio = null, target = null;
+  let state = 'idle', lastTranscript = '', lastAudio = null, target = null, savingSettings = false;
   let operation = null, quitting = false, shortcutReady = false, generation = 0, activeMeeting = null, worker = null, awake = null;
   const win = new BrowserWindow({width: 1120, height: 820, minWidth: 840, minHeight: 640, title: 'MatiQ Voice', backgroundColor: '#ffffff', show: false,
     webPreferences: {preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false}});
@@ -132,7 +132,25 @@ async function start(options) {
   }
   handle('status', async () => ({state, settings, models: MODELS, maxSeconds: MAX_SECONDS, lastTranscript, canRetry: Boolean(lastAudio), shortcutReady, startupNotice, platform: process.platform, packaged: app.isPackaged,
     hardware, setup, permissions: permissionStatus(), connections: await connections.status(), activeMeeting, ...(await ready())}));
-  handle('settings', async value => { if (state !== 'idle') throw new Error('Finish the current operation before changing preferences.'); const next = validateSettings(value); await saveJSON(settingsFile, next); if (next.microphone !== settings.microphone) { setup.microphoneTested = false; setup.completed = false; await saveJSON(setupFile, setup); } settings = next; return ready(); });
+  handle('settings', async value => {
+    if (state !== 'idle' || savingSettings) throw new Error('Wait for the current operation or preference save to finish.');
+    savingSettings = true;
+    try {
+      const next = validateSettings({...value, shortcut: value?.shortcut ?? settings.shortcut});
+      const changed = next.shortcut !== settings.shortcut, needsRegistration = changed || !shortcutReady;
+      if (needsRegistration && !globalShortcut.register(next.shortcut, () => send({type: 'toggle'}))) {
+        throw new Error('That shortcut is unavailable. Choose another combination; your previous binding was kept.');
+      }
+      try {
+        if (next.microphone !== settings.microphone) {
+          setup.microphoneTested = false; setup.completed = false; await saveJSON(setupFile, setup);
+        }
+        await saveJSON(settingsFile, next);
+      } catch (error) { if (needsRegistration) globalShortcut.unregister(next.shortcut); throw error; }
+      if (changed) globalShortcut.unregister(settings.shortcut);
+      settings = next; shortcutReady = true; updateTray(); return ready();
+    } finally { savingSettings = false; }
+  });
   handle('download', async () => {
     if (state !== 'idle') throw new Error('Finish the current operation first.');
     operation = new AbortController(); setState('downloading');
@@ -227,9 +245,9 @@ async function start(options) {
     await fs.writeFile(result.filePath, text, {mode: 0o600}); return true;
   });
   handle('quit', () => { quitting = true; app.quit(); });
-  await hud.loadURL(hudURL); await win.loadURL(pageURL);
-  shortcutReady = globalShortcut.register('CommandOrControl+Shift+Space', () => send({type: 'toggle'}));
+  shortcutReady = globalShortcut.register(settings.shortcut, () => send({type: 'toggle'}));
   if (!globalShortcut.register('CommandOrControl+Alt+Backspace', () => send({type: 'cancel'}))) startupNotice += ' The cancel shortcut is unavailable. Use the app controls.';
+  await hud.loadURL(hudURL); await win.loadURL(pageURL);
   show();
 }
 if (require.main === module) launch();

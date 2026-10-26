@@ -1,14 +1,14 @@
 # Validation
 
-Checked 2026-10-24 on Apple Silicon. This file distinguishes implemented behavior
+Checked 2026-10-26 on Apple Silicon. This file distinguishes implemented behavior
 from external account, platform and distribution qualification.
 
 ## Local checks
 
-- 21 Node tests pass, including hardware selection, durable meeting storage,
+- 22 Node tests pass, including hardware selection, durable meeting storage,
   source-linked notes, WAV validation, PKCE/state, consent refusal, cancellation,
   refresh serialization, locked-key-store disconnect and disconnect/refresh races.
-- Ten Electron E2E journeys pass using real Base English recognition and local
+- Eleven Electron E2E journeys pass using real Base English recognition and local
   ONNX speaker segmentation/embedding. The suite exercises first-run hardware
   checks, a failed download and retry, model verification, microphone setup,
   dictation, consent flows, calendar links, encrypted credentials, meeting
@@ -34,8 +34,14 @@ from external account, platform and distribution qualification.
   is a passed build. See [PR #1](https://github.com/GoMatiQ-inc/matiq-voice/pull/1)
   for the account billing annotation.
 
-Posting a shortcut alone is never delivery proof. The default dictation
-shortcut is Cmd Shift Space / Ctrl Shift Space; failed registration is visible.
+Custom global toggle bindings register with the OS, replace the previous
+binding, and persist after restart. E2E checks real registration, conflict
+rejection and rollback after a settings-write failure. The binding is
+registered before the renderer loads so its initial availability is accurate.
+Default: Cmd Option Shift Space / Ctrl Alt Shift Space. Settings can choose a
+different combination without restarting. Hold-to-talk is not implemented.
+Posting a shortcut alone is never text-delivery proof; the native insertion
+qualification limits above still apply.
 
 ## Reproduce
 
@@ -78,7 +84,7 @@ screen. Calendar API activation awaits acceptance of its separate terms;
 authenticated token exchange and calendar access remain unqualified.
 
 Both real registrations are included in the rebuilt Apple Silicon development
-installer. The 21 unit tests, ten app E2E journeys and packaged native-inference /
+installer. The 22 unit tests, eleven app E2E journeys and packaged native-inference /
 registration checks pass again with this build. No account consent result is
 inferred from those fixture tests.
 

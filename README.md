@@ -16,8 +16,10 @@ Install the app for your OS/architecture and follow first-run setup:
 4. Optionally connect Microsoft or Google through the system browser.
 5. Finish setup. No terminal, Python, Node or package installation is needed.
 
-**⌘ Shift Space** on Mac / **Ctrl Shift Space** on Windows starts and stops
-background dictation. Wait for Listening. The HUD leaves the original field
+**⌘ Option Shift Space** on Mac / **Ctrl Alt Shift Space** on Windows starts
+and stops background dictation. Change this under **Settings → Dictation shortcut**:
+choose modifiers and a key, then Save shortcut. Unavailable combinations are
+rejected and the previous binding is retained. Bindings persist across restarts. Wait for Listening. The HUD leaves the original field
 focused. Closing the main window hides it; use the menu-bar/system-tray menu to
 open it or Quit. The original field is checked again before inserting text;
 unsupported/changed destinations leave a recoverable transcript to copy.

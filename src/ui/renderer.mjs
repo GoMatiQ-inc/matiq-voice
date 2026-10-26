@@ -23,7 +23,7 @@ function paint() {
   $('record').disabled = starting || !snapshot.setup.completed || !snapshot.engineReady || !snapshot.modelReady || (!idle && state !== 'recording');
   $('record').textContent = state === 'recording' ? 'Stop & transcribe' : 'Start dictation';
   $('cancel').hidden = idle || state.startsWith('meeting');
-  for (const id of ['model', 'microphone', 'autoPaste', 'save', 'refresh', 'clear', 'download', 'retry', 'new-meeting']) $(id).disabled = !idle || starting;
+  for (const id of ['model', 'microphone', 'autoPaste', 'save', 'refresh', 'clear', 'download', 'retry', 'new-meeting', 'shortcut-save', 'shortcut-default', 'shortcut-key']) $(id).disabled = !idle || starting;
   $('download').textContent = snapshot.modelReady && snapshot.speakerReady ? 'Verify & repair' : 'Download & verify';
   $('copy').disabled = !$('transcript').value;
   const labels = {idle: snapshot.setup.completed ? 'Ready when you are.' : 'Complete setup to start dictating.', preparing: 'Preparing dictation…', recording: 'Listening. Your microphone is active.', processing: 'Transcribing on this device…', downloading: 'Downloading local models…', cancelling: 'Cancelling…', 'meeting-preparing': 'Preparing meeting capture…', 'meeting-recording': 'Recording meeting audio.', 'meeting-paused': 'Meeting recording paused.', 'meeting-processing': 'Processing meeting on this device…'};
@@ -32,10 +32,30 @@ function paint() {
   $('retry').hidden = !snapshot.canRetry;
   $('model-status').textContent = snapshot.modelReady && snapshot.speakerReady ? 'Speech and speaker models are installed. Recognition can run offline.' : 'Download the selected speech model and speaker models before completing setup.';
   $('launch-login').disabled = !snapshot.packaged;
+  $('shortcut-modifiers').disabled = !idle || starting;
+  $('shortcut').textContent = shortcutLabel(snapshot.settings.shortcut);
+  $('shortcut-status').textContent = snapshot.shortcutReady ? `Active: ${shortcutLabel(snapshot.settings.shortcut)}` : 'Shortcut unavailable. Choose and save a different combination.';
 }
 async function refresh() {
   snapshot = await api.status(); state = snapshot.state; paint();
   renderConnections($('connections')); $('hardware-settings').innerHTML = deviceHTML();
+}
+function shortcutLabel(value) {
+  return value.split('+').map(part => ({Command: '⌘', Control: snapshot.platform === 'darwin' ? '⌃' : 'Ctrl', Alt: snapshot.platform === 'darwin' ? '⌥' : 'Alt', Shift: '⇧', Super: 'Windows'}[part] || part)).join(' + ');
+}
+function chosenShortcut() {
+  return [...$('shortcut-modifiers').querySelectorAll('input:checked')].map(input => input.value).concat($('shortcut-key').value).join('+');
+}
+function shortcutControls(value) {
+  const parts = value.split('+'); $('shortcut-key').value = parts.pop();
+  for (const input of $('shortcut-modifiers').querySelectorAll('input')) input.checked = parts.includes(input.value);
+  $('shortcut-preview').textContent = `New binding: ${shortcutLabel(chosenShortcut())}`;
+}
+async function saveShortcut(value) {
+  try {
+    await api.settings({...snapshot.settings, shortcut: value}); await refresh(); shortcutControls(snapshot.settings.shortcut);
+    message(`Shortcut saved: ${shortcutLabel(snapshot.settings.shortcut)}. Press once to start and again to stop.`);
+  } catch (error) { $('shortcut-status').textContent = cleanError(error); showError(error); }
 }
 function deviceHTML() {
   const h = snapshot.hardware;
@@ -50,7 +70,7 @@ async function microphones(request = false) {
   if ([...$('microphone').options].some(option => option.value === selected)) $('microphone').value = selected;
 }
 async function savePreferences(overrides = {}) {
-  await api.settings({model: $('model').value, microphone: $('microphone').value, autoPaste: $('autoPaste').checked, ...overrides});
+  await api.settings({model: $('model').value, microphone: $('microphone').value, autoPaste: $('autoPaste').checked, shortcut: snapshot.settings.shortcut, ...overrides});
   await refresh();
 }
 function renderConnections(target) {
@@ -111,7 +131,7 @@ function renderSetup() {
     $('setup-copy-only').onchange = async event => { $('autoPaste').checked = !event.target.checked; await savePreferences(); renderSetup(); };
     $('setup-next').disabled ||= snapshot.settings.autoPaste && !snapshot.permissions.accessibility;
   } else if (setupStep === 4) { content.innerHTML = '<div id="setup-connections"></div><p class="caption">Connections are optional. Local recording works without calendar access. Connecting a calendar does not create an independently joining meeting bot.</p>'; renderConnections($('setup-connections')); }
-  else content.innerHTML = `<ul class="setup-step-list"><li>English speech model <small>${escape(snapshot.settings.model)} installed and verified</small></li><li>Speaker labels <small>Local segmentation and English speaker-embedding models installed</small></li><li>Microphone <small>Audio input tested</small></li><li>Background dictation <small>${snapshot.platform === 'darwin' ? '⌘ Shift Space' : 'Ctrl Shift Space'} starts and stops dictation</small></li></ul><p class="caption">Meeting audio is saved locally only when you explicitly start recording. Recognition and speaker labels can still contain errors.</p>`;
+  else content.innerHTML = `<ul class="setup-step-list"><li>English speech model <small>${escape(snapshot.settings.model)} installed and verified</small></li><li>Speaker labels <small>Local segmentation and English speaker-embedding models installed</small></li><li>Microphone <small>Audio input tested</small></li><li>Background dictation <small>${escape(shortcutLabel(snapshot.settings.shortcut))} starts and stops dictation</small></li></ul><p class="caption">Meeting audio is saved locally only when you explicitly start recording. Recognition and speaker labels can still contain errors.</p>`;
 }
 $('setup-next').onclick = async () => { try { if (setupStep === 5) { await api.completeSetup(); await refresh(); $('setup-dialog').close(); message('Setup complete. Start dictation from any text field with your shortcut.'); } else { setupStep++; renderSetup(); } } catch (error) { setupError(error); } };
 $('setup-back').onclick = () => { if (!setupBusy && setupStep > 0) { setupStep--; renderSetup(); } };
@@ -264,6 +284,9 @@ $('copy').onclick = () => api.copy().then(() => message('Transcript copied.')).c
 $('clear').onclick = () => api.clear().then(refresh).catch(showError);
 $('retry').onclick = () => api.retry().catch(showError).finally(refresh);
 $('refresh').onclick = () => microphones(true).catch(showError);
+$('shortcut-save').onclick = () => saveShortcut(chosenShortcut());
+$('shortcut-default').onclick = () => saveShortcut(`${snapshot.platform === 'darwin' ? 'Command' : 'Control'}+Alt+Shift+Space`);
+for (const id of ['shortcut-modifiers', 'shortcut-key']) $(id).onchange = () => { $('shortcut-preview').textContent = `New binding: ${shortcutLabel(chosenShortcut())}`; };
 $('save').onclick = () => savePreferences().then(() => message('Preferences saved.')).catch(showError);
 $('download').onclick = async () => { try { await savePreferences(); await api.download(); } catch (error) { showError(error); } finally { await refresh(); } };
 $('accessibility').onclick = () => api.accessibility().catch(showError);
@@ -275,9 +298,12 @@ try {
   await refresh();
   for (const [id, model] of Object.entries(snapshot.models)) $('model').add(new Option(model.label, id));
   $('model').value = snapshot.settings.model; $('autoPaste').checked = snapshot.settings.autoPaste; $('launch-login').checked = snapshot.setup.launchAtLogin;
-  $('transcript').value = snapshot.lastTranscript; $('shortcut').textContent = snapshot.platform === 'darwin' ? '⌘ Shift Space' : 'Ctrl Shift Space';
+  $('transcript').value = snapshot.lastTranscript;
+  for (const key of ['Space', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', ...Array.from({length: 24}, (_, i) => `F${i + 1}`), '.', ',', '/', ';', "'", '`', '=', '-', '[', ']', '\\']) $('shortcut-key').add(new Option(key, key));
+  $('shortcut-command').parentElement.hidden = snapshot.platform !== 'darwin'; $('shortcut-super').parentElement.hidden = snapshot.platform === 'darwin';
+  shortcutControls(snapshot.settings.shortcut);
   await microphones(); paint();
   if (snapshot.startupNotice) message(snapshot.startupNotice);
-  if (!snapshot.shortcutReady) message('The global shortcut is unavailable. Close another app using it and restart MatiQ Voice.');
+  if (!snapshot.shortcutReady) message('The global shortcut is unavailable. Open Settings and save a different dictation shortcut.');
   if (!snapshot.setup.completed) openSetup();
 } catch (error) { showError(error); }
