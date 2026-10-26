@@ -4,31 +4,15 @@ const MODELS = Object.freeze({
   'medium.en': {label: 'Medium English · 1.53 GB · more demanding', bytes: 1533774781, sha256: 'cc37e93478338ec7700281a7ac30a10128929eb8f427dda2e865faa8f6da4356'}
 });
 const MAX_SECONDS = 300;
-const DEFAULT_SHORTCUT = process.platform === 'darwin' ? 'Command+Alt+Shift+Space' : 'Control+Alt+Shift+Space';
-const DEFAULT_SETTINGS = Object.freeze({model: 'small.en', autoPaste: true, microphone: '', shortcut: DEFAULT_SHORTCUT});
-
-function validateShortcut(value) {
-  const parts = typeof value === 'string' && value.length < 80 ? value.split('+') : [];
-  const key = parts.pop(), order = ['Command', 'Control', 'Alt', 'Shift', 'Super'];
-  const keyAllowed = typeof key === 'string' && (/^(?:[A-Z0-9]|F(?:[1-9]|1[0-9]|2[0-4])|Space)$/.test(key) ||
-    (key.length === 1 && ".,/;'`=-[]\\".includes(key)));
-  if (!parts.length || !parts.some(part => part !== 'Shift') || parts.some(part => !order.includes(part)) ||
-      new Set(parts).size !== parts.length || !keyAllowed) {
-    throw new Error('Choose Command, Control, Option/Alt or Windows plus a listed key. Shift alone is not enough.');
-  }
-  const shortcut = [...order.filter(part => parts.includes(part)), key].join('+');
-  if (process.platform === 'darwin' && ['Command+Space', 'Control+Space'].includes(shortcut)) {
-    throw new Error('That shortcut is used by macOS search or input switching. Add a modifier or choose another key.');
-  }
-  return shortcut;
-}
+const {migrateBindings} = require('./key-bindings.cjs');
+const DEFAULT_SETTINGS = Object.freeze({model: 'small.en', autoPaste: true, microphone: '', bindings: migrateBindings({})});
 
 function validateSettings(value) {
   if (!value || !Object.hasOwn(MODELS, value.model) || typeof value.autoPaste !== 'boolean' ||
       typeof value.microphone !== 'string' || value.microphone.length > 512) {
     throw new Error('Invalid settings. Choose a listed model and microphone.');
   }
-  return {model: value.model, autoPaste: value.autoPaste, microphone: value.microphone, shortcut: validateShortcut(value.shortcut ?? DEFAULT_SHORTCUT)};
+  return {model: value.model, autoPaste: value.autoPaste, microphone: value.microphone, bindings: migrateBindings(value)};
 }
 
 function validateWav(input) {
@@ -58,4 +42,4 @@ function transcriptFromFile(text) {
   return text.replace(/\r?\n/g, ' ').trim();
 }
 
-module.exports = {MODELS, MAX_SECONDS, DEFAULT_SETTINGS, DEFAULT_SHORTCUT, validateShortcut, validateSettings, validateWav, whisperArgs, transcriptFromFile};
+module.exports = {MODELS, MAX_SECONDS, DEFAULT_SETTINGS, validateSettings, validateWav, whisperArgs, transcriptFromFile};

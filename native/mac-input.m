@@ -83,7 +83,7 @@ int main(int argc, const char *argv[]) {
                     if (existing) CFRelease(existing);
                     CGEventRef down = CGEventCreateKeyboardEvent(NULL, 9, true), up = CGEventCreateKeyboardEvent(NULL, 9, false);
                     if (!down || !up) result = 79;
-                    else { CGEventSetFlags(down, kCGEventFlagMaskCommand); CGEventSetFlags(up, kCGEventFlagMaskCommand); CGEventPostToPid(originalPid, down); CGEventPostToPid(originalPid, up); }
+                    else { CGEventSetIntegerValueField(down, kCGEventSourceUserData, 0x4d51564f); CGEventSetIntegerValueField(up, kCGEventSourceUserData, 0x4d51564f); CGEventSetFlags(down, kCGEventFlagMaskCommand); CGEventSetFlags(up, kCGEventFlagMaskCommand); CGEventPostToPid(originalPid, down); CGEventPostToPid(originalPid, up); }
                     if (down) CFRelease(down); if (up) CFRelease(up);
                 }
             }
@@ -106,7 +106,7 @@ int main(int argc, const char *argv[]) {
             CGEventRef down = CGEventCreateKeyboardEvent(NULL, 9, true);
             CGEventRef up = CGEventCreateKeyboardEvent(NULL, 9, false);
             if (!down || !up) return 79;
-            CGEventSetFlags(down, kCGEventFlagMaskCommand);
+            CGEventSetIntegerValueField(down, kCGEventSourceUserData, 0x4d51564f); CGEventSetIntegerValueField(up, kCGEventSourceUserData, 0x4d51564f); CGEventSetFlags(down, kCGEventFlagMaskCommand);
             CGEventSetFlags(up, kCGEventFlagMaskCommand);
             CGEventPost(kCGHIDEventTap, down);
             CGEventPost(kCGHIDEventTap, up);

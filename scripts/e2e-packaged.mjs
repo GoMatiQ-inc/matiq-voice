@@ -34,6 +34,7 @@ try {
   try { registrations = JSON.parse(await fs.readFile(path.join(root, 'config/oauth.json'), 'utf8')); }
   catch (error) { if (error.code !== 'ENOENT') throw error; }
   const installedStatus = await page.evaluate(() => window.matiqVoice.status());
+  assert.ok(Array.isArray(installedStatus.settings.bindings.toggle) && Array.isArray(installedStatus.settings.bindings.hold), 'Packaged settings must expose physical toggle and hold bindings.');
   for (const provider of ['microsoft', 'google']) assert.equal(installedStatus.connections[provider].configured, Boolean(registrations[provider]?.clientId), `${provider} registration must survive packaging`);
 
   const speech = wavBytes(await fs.readFile(path.join(fixtures, 'jfk.wav')));
@@ -53,7 +54,7 @@ try {
   }, audio);
   assert.equal(meeting.status,'ready'); assert.ok(meeting.segments.length > 0);
   assert.ok(Object.keys(meeting.speakers).filter(id=>id.startsWith('remote-')).length >= 2);
-  const result = {packaged:true, platform:process.platform, arch:process.arch, shortcutRegistered:(await page.evaluate(() => window.matiqVoice.status())).shortcutReady, checks:['isolated profile','bundled speech recognition','bundled ONNX speaker inference','OAuth registration configuration'], limitations:['Public audio fixtures; no real meeting or OS capture permissions tested.']};
+  const result = {packaged:true, platform:process.platform, arch:process.arch, keyboardAccessReady:(await page.evaluate(() => window.matiqVoice.status())).shortcutReady, checks:['isolated profile','bundled speech recognition','bundled ONNX speaker inference','OAuth registration configuration','physical binding settings'], limitations:['Public audio fixtures; no real meeting or physical keyboard event delivery tested. Keyboard permission availability is reported separately.']};
   await fs.writeFile(path.join(fixtures,'packaged-results.json'),JSON.stringify(result,null,2));
   console.log(JSON.stringify(result,null,2));
 } finally {

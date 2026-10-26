@@ -23,11 +23,22 @@ app. Closing hides the app; menu bar/system tray controls remain alive.
 
 ## Dictation
 
-Settings allow a custom global toggle shortcut using modifier keys plus a
-letter, number, function key or listed punctuation key. One press starts and a
-second press stops. This is not hold-to-talk. Changes take effect immediately
-and persist; conflicts keep the old binding. macOS Command Space and Control
-Space are rejected to avoid search/input-switching shortcuts.
+Record binding captures the physical keyboard keys held together until all
+are released. It stores left/right modifier identities separately and permits
+modifier-only bindings. Toggle and push to talk have separate bindings; empty
+means disabled. A binding cannot contain the entirety of the other binding,
+because that would trigger both modes on one chord. Save failures preserve the
+old bindings. Old generic shortcuts migrate to left-side physical keys.
+
+Toggle reacts once per press, ignores auto-repeat, and stops on the next press.
+Push to talk stops when any bound key is released, including release during
+microphone startup. Loss of keyboard access, sleep or screen lock stops active
+dictation. Dictation remains bounded at five minutes. The keyboard helper uses
+native press/release events and requires OS permissions. Active typing-key
+bindings intercept their trigger key; modifier events continue to the OS.
+System-reserved, secure-input and firmware-only keys can prevent detection.
+Ordinary keystrokes are not logged or persisted; only explicit captured binding
+identities are saved. A capture session cancels on focus loss or timeout.
 
 The global shortcut starts a nonactivating HUD. Listening appears after the
 capture graph is ready. All audio samples through the final acknowledgement

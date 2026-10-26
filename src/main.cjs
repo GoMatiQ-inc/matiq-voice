@@ -1,4 +1,4 @@
-const {app, BrowserWindow, Menu, Tray, nativeImage, globalShortcut, ipcMain, clipboard, session, systemPreferences, shell, dialog, safeStorage, desktopCapturer, utilityProcess, powerSaveBlocker} = require('electron');
+const {app, BrowserWindow, Menu, Tray, nativeImage, globalShortcut, ipcMain, clipboard, session, systemPreferences, shell, dialog, safeStorage, desktopCapturer, utilityProcess, powerSaveBlocker, powerMonitor} = require('electron');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const {pathToFileURL} = require('node:url');
@@ -9,6 +9,7 @@ const {SPEAKER_MODELS, downloadAsset} = require('./assets.cjs');
 const {EncryptedTokenStore, Connections, meetingURL} = require('./oauth.cjs');
 const {MeetingStore} = require('./meetings.cjs');
 const {captureTarget} = require('./input.cjs');
+const {Keyboard} = require('./keyboard.cjs');
 
 function launch(options = {}) {
   app.setName('MatiQ Voice');
@@ -49,6 +50,14 @@ async function start(options) {
   win.setMenuBarVisibility(false); hud.setVisibleOnAllWorkspaces(true, {visibleOnFullScreen: true});
   const send = message => { if (!win.isDestroyed()) win.webContents.send('app-event', message); };
   const notice = message => send({type: 'notice', message});
+  const nativeDir = app.isPackaged ? path.join(process.resourcesPath, 'native') : path.join(__dirname, '..', 'native');
+  const keyboard = new Keyboard({engineDir, nativeDir, ...(options.keyboardSpawn ? {spawnProcess: options.keyboardSpawn} : {}), bindings: settings.bindings, emit: event => {
+    if (event.type === 'keyboard-status') shortcutReady = event.ready;
+    send(event);
+  }});
+  win.on('blur', () => { if (keyboard.router.recording) { keyboard.cancelRecord(); send({type:'binding-cancelled',message:'Binding recording cancelled when MatiQ Voice lost focus.'}); } });
+  powerMonitor.on('suspend', () => keyboard.reset());
+  powerMonitor.on('lock-screen', () => keyboard.reset());
   const icon = nativeImage.createFromPath(path.join(__dirname, 'ui', 'tray.png'));
   if (process.platform === 'darwin') icon.setTemplateImage(true);
   const tray = new Tray(icon), show = () => { win.show(); win.focus(); };
@@ -80,7 +89,7 @@ async function start(options) {
     for (const provider of ['microsoft', 'google']) connections.cancel(provider);
     if (awake !== null) powerSaveBlocker.stop(awake);
   });
-  app.on('will-quit', () => globalShortcut.unregisterAll());
+  app.on('will-quit', () => { keyboard.stop(); globalShortcut.unregisterAll(); });
   const isOwnFrame = frame => frame?.url === pageURL;
   session.defaultSession.setPermissionRequestHandler((contents, permission, callback, details) => {
     const own = contents === win.webContents && isOwnFrame(contents.mainFrame);
@@ -96,6 +105,7 @@ async function start(options) {
   }, {useSystemPicker: true});
   for (const window of [win, hud]) { window.webContents.on('will-navigate', event => event.preventDefault()); window.webContents.setWindowOpenHandler(() => ({action: 'deny'})); }
   win.webContents.on('render-process-gone', (_, details) => {
+    keyboard.cancelRecord();
     operation?.abort(); worker?.kill(); target?.cancel(); target = null; setState('idle');
     if (awake !== null) { powerSaveBlocker.stop(awake); awake = null; }
     const interrupted = activeMeeting; activeMeeting = null;
@@ -130,26 +140,30 @@ async function start(options) {
     } catch (error) { if (!controller.signal.aborted) { notice(`Recognition failed: ${error.message} Use Retry; your audio is retained in memory.`); throw error; } }
     finally { operation = null; target?.cancel(); target = null; setState('idle'); }
   }
-  handle('status', async () => ({state, settings, models: MODELS, maxSeconds: MAX_SECONDS, lastTranscript, canRetry: Boolean(lastAudio), shortcutReady, startupNotice, platform: process.platform, packaged: app.isPackaged,
+  handle('status', async () => ({state, settings, models: MODELS, maxSeconds: MAX_SECONDS, lastTranscript, canRetry: Boolean(lastAudio), shortcutReady, keyboardError: keyboard.error, startupNotice, platform: process.platform, packaged: app.isPackaged,
     hardware, setup, permissions: permissionStatus(), connections: await connections.status(), activeMeeting, ...(await ready())}));
   handle('settings', async value => {
     if (state !== 'idle' || savingSettings) throw new Error('Wait for the current operation or preference save to finish.');
     savingSettings = true;
     try {
-      const next = validateSettings({...value, shortcut: value?.shortcut ?? settings.shortcut});
-      const changed = next.shortcut !== settings.shortcut, needsRegistration = changed || !shortcutReady;
-      if (needsRegistration && !globalShortcut.register(next.shortcut, () => send({type: 'toggle'}))) {
-        throw new Error('That shortcut is unavailable. Choose another combination; your previous binding was kept.');
+      const next = validateSettings({...value, bindings: value?.bindings ?? settings.bindings});
+      if (next.microphone !== settings.microphone) {
+        setup.microphoneTested = false; setup.completed = false; await saveJSON(setupFile, setup);
       }
-      try {
-        if (next.microphone !== settings.microphone) {
-          setup.microphoneTested = false; setup.completed = false; await saveJSON(setupFile, setup);
-        }
-        await saveJSON(settingsFile, next);
-      } catch (error) { if (needsRegistration) globalShortcut.unregister(next.shortcut); throw error; }
-      if (changed) globalShortcut.unregister(settings.shortcut);
-      settings = next; shortcutReady = true; updateTray(); return ready();
+      await saveJSON(settingsFile, next);
+      settings = next; keyboard.configure(settings.bindings); updateTray(); return ready();
     } finally { savingSettings = false; }
+  });
+  handle('binding-record', mode => {
+    if (!['toggle','hold'].includes(mode) || state !== 'idle' || !win.isFocused()) throw new Error('Open Settings and finish recording before choosing a binding.');
+    keyboard.record(mode);
+  });
+  handle('binding-cancel', () => keyboard.cancelRecord());
+  handle('keyboard-enable', async () => {
+    if (process.platform === 'darwin' && !systemPreferences.isTrustedAccessibilityClient(true)) {
+      await shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility');
+    }
+    await keyboard.start(); return {ready:keyboard.ready};
   });
   handle('download', async () => {
     if (state !== 'idle') throw new Error('Finish the current operation first.');
@@ -245,7 +259,7 @@ async function start(options) {
     await fs.writeFile(result.filePath, text, {mode: 0o600}); return true;
   });
   handle('quit', () => { quitting = true; app.quit(); });
-  shortcutReady = globalShortcut.register(settings.shortcut, () => send({type: 'toggle'}));
+  try { await keyboard.start(); } catch (error) { startupNotice += ` ${error.message}`; }
   if (!globalShortcut.register('CommandOrControl+Alt+Backspace', () => send({type: 'cancel'}))) startupNotice += ' The cancel shortcut is unavailable. Use the app controls.';
   await hud.loadURL(hudURL); await win.loadURL(pageURL);
   show();

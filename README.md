@@ -16,14 +16,26 @@ Install the app for your OS/architecture and follow first-run setup:
 4. Optionally connect Microsoft or Google through the system browser.
 5. Finish setup. No terminal, Python, Node or package installation is needed.
 
-**⌘ Option Shift Space** on Mac / **Ctrl Alt Shift Space** on Windows starts
-and stops background dictation. Change this under **Settings → Dictation shortcut**:
-choose modifiers and a key, then Save shortcut. Unavailable combinations are
-rejected and the previous binding is retained. Bindings persist across restarts. Wait for Listening. The HUD leaves the original field
-focused. Closing the main window hides it; use the menu-bar/system-tray menu to
-open it or Quit. The original field is checked again before inserting text;
-unsupported/changed destinations leave a recoverable transcript to copy.
-There is no word-removal or rewriting stage. Recognition itself can err.
+In **Settings → Dictation bindings**, click **Record binding** beside Toggle or
+Push to talk, hold your desired key or combination, release all keys, then Save.
+Left and right Command/Control/Option/Shift are stored separately; a modifier
+alone is allowed. Toggle records until its next press. Push to talk records
+while held and transcribes when any constituent key is released. Both retain
+the existing five-minute dictation limit. Wait for Listening before speaking.
+The initial toggle is Left Command + Left Option + Left Shift + Space on Mac,
+or Left Control + Left Alt + Left Shift + Space on Windows; hold is initially
+unset. Old generic bindings migrate to left-side keys, shown explicitly in UI.
+
+Keyboard access is required for background detection. Use Check keyboard access
+in Settings and grant the requested macOS Accessibility/Input Monitoring
+permission. Key combinations can override the same keys in other apps; some
+system-reserved or hardware/media keys are not exposed by the OS. Ordinary keyboard events are never logged. Saved bindings contain key identities.
+
+The HUD leaves the original field focused. Closing the main window hides it;
+use the menu-bar/system-tray menu to open it or Quit. The original field is
+checked before insertion; unsupported/changed destinations leave a recoverable
+transcript to copy. There is no word-removal or rewriting stage. Recognition
+itself can err.
 
 For meetings, select an upcoming calendar event or choose Record meeting.
 Attend the Teams/Meet call on this computer and explicitly start local capture.

@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const {mkdtemp, readdir, rm} = require('node:fs/promises');
 const {tmpdir} = require('node:os');
 const path = require('node:path');
-const {DEFAULT_SHORTCUT, validateShortcut, validateSettings, validateWav, whisperArgs, transcriptFromFile} = require('../src/core.cjs');
+const {DEFAULT_SETTINGS, validateSettings, validateWav, whisperArgs, transcriptFromFile} = require('../src/core.cjs');
 const {run, downloadModel} = require('../src/engine.cjs');
 
 test('preserves fillers, repetitions, corrections, and spoken commands', () => {
@@ -19,7 +19,7 @@ test('recognition arguments do not enable translation, VAD, prompts, or text fil
 });
 
 test('accepts only known models and typed settings', () => {
-  assert.deepEqual(validateSettings({model: 'small.en', autoPaste: false, microphone: 'device'}), {model: 'small.en', autoPaste: false, microphone: 'device', shortcut: DEFAULT_SHORTCUT});
+  assert.deepEqual(validateSettings({model: 'small.en', autoPaste: false, microphone: 'device'}), {model: 'small.en', autoPaste: false, microphone: 'device', bindings: DEFAULT_SETTINGS.bindings});
   for (const model of ['../../other', '__proto__', 'constructor']) assert.throws(() => validateSettings({model, autoPaste: true, microphone: ''}));
   assert.throws(() => validateSettings({model: 'small.en', autoPaste: 'yes', microphone: ''}));
 });
@@ -64,12 +64,4 @@ test('incomplete model downloads cannot become installed models', async () => {
     assert.deepEqual(await readdir(directory), []);
     await assert.rejects(downloadModel('../escape', directory, () => {}), /listed speech model/);
   } finally { global.fetch = original; await rm(directory, {recursive: true, force: true}); }
-});
-
-test('shortcut migration, validation and canonical order preserve valid custom bindings', () => {
-  assert.equal(validateSettings({model: 'base.en', autoPaste: true, microphone: ''}).shortcut, DEFAULT_SHORTCUT);
-  assert.equal(validateShortcut('Shift+Alt+Control+K'), 'Control+Alt+Shift+K');
-  for (const key of [".", ",", "/", ";", "'", '`', '=', '-', '[', ']', '\\', 'F24', '0']) assert.equal(validateShortcut(`Control+${key}`), `Control+${key}`);
-  for (const value of ['Space', 'Shift+A', 'Control+Control+A', 'Control+', 'Control+Unknown', 'Control+A+B', {}, 'Control+\\nA']) assert.throws(() => validateShortcut(value));
-  if (process.platform === 'darwin') for (const value of ['Command+Space', 'Control+Space']) assert.throws(() => validateShortcut(value), /macOS/);
 });

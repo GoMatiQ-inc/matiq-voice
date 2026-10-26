@@ -5,10 +5,10 @@ from external account, platform and distribution qualification.
 
 ## Local checks
 
-- 22 Node tests pass, including hardware selection, durable meeting storage,
+- 28 Node tests pass, including hardware selection, durable meeting storage,
   source-linked notes, WAV validation, PKCE/state, consent refusal, cancellation,
   refresh serialization, locked-key-store disconnect and disconnect/refresh races.
-- Eleven Electron E2E journeys pass using real Base English recognition and local
+- Thirteen Electron E2E journeys pass using real Base English recognition and local
   ONNX speaker segmentation/embedding. The suite exercises first-run hardware
   checks, a failed download and retry, model verification, microphone setup,
   dictation, consent flows, calendar links, encrypted credentials, meeting
@@ -34,14 +34,17 @@ from external account, platform and distribution qualification.
   is a passed build. See [PR #1](https://github.com/GoMatiQ-inc/matiq-voice/pull/1)
   for the account billing annotation.
 
-Custom global toggle bindings register with the OS, replace the previous
-binding, and persist after restart. E2E checks real registration, conflict
-rejection and rollback after a settings-write failure. The binding is
-registered before the renderer loads so its initial availability is accurate.
-Default: Cmd Option Shift Space / Ctrl Alt Shift Space. Settings can choose a
-different combination without restarting. Hold-to-talk is not implemented.
-Posting a shortcut alone is never text-delivery proof; the native insertion
-qualification limits above still apply.
+Physical-key toggle and push-to-talk bindings replace accelerator strings.
+Native Mac callback fixtures pass left/right modifier coexistence, release,
+repeat suppression, trigger-key interception and own-paste exclusion. The real
+Mac event tap opens successfully on the development host. The 13 app journeys
+use an explicit helper-protocol fixture for keyboard events, exercising capture,
+save failure, cancellation, opposite sides, hold release, toggle repeats,
+quick release during delayed microphone startup and restart persistence.
+They do not prove physical event delivery or permission grants on the MacBook.
+Windows native keyboard-hook code is implemented but unqualified on Windows.
+Posting a shortcut alone is never text-delivery proof; native insertion limits
+above still apply. The pre-existing five-minute dictation limit remains.
 
 ## Reproduce
 
@@ -84,7 +87,7 @@ screen. Calendar API activation awaits acceptance of its separate terms;
 authenticated token exchange and calendar access remain unqualified.
 
 Both real registrations are included in the rebuilt Apple Silicon development
-installer. The 22 unit tests, eleven app E2E journeys and packaged native-inference /
+installer. The 28 unit tests, thirteen app E2E journeys and packaged native-inference /
 registration checks pass again with this build. No account consent result is
 inferred from those fixture tests.
 
