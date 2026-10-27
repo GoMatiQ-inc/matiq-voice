@@ -8,7 +8,7 @@ module.exports = async context => {
   if (metadata.platform !== platform || metadata.arch !== arch) {
     throw new Error(`Engine is ${metadata.platform}/${metadata.arch}, but app is ${platform}/${arch}. Build the engine on the matching runner first.`);
   }
-  if (metadata.nativeInputVersion !== 4) throw new Error('Rebuild the native input helper before packaging.');
+  if (metadata.nativeInputVersion !== 5) throw new Error('Rebuild the native input helper before packaging.');
   const nativePackage = `sherpa-onnx-${platform === 'win32' ? 'win' : platform}-${arch}`;
   const nativeRoot = path.dirname(require.resolve(`${nativePackage}/package.json`));
   if (!fs.readdirSync(nativeRoot, {recursive: true}).some(file => String(file).endsWith('.node'))) throw new Error(`Missing ${nativePackage} inference addon. Reinstall dependencies on the matching runner.`);

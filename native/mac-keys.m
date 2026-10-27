@@ -44,12 +44,16 @@ static CGEventRef keyboard(CGEventTapProxy proxy, CGEventType type, CGEventRef e
     return consume && type!=kCGEventFlagsChanged ? NULL : event;
     }
 }
-int main(void) {
+int main(int argc, const char *argv[]) {
     @autoreleasepool {
+        BOOL requestAccess=argc>1 && strcmp(argv[1],"--request-access")==0;
+        if(requestAccess && !AXIsProcessTrustedWithOptions((CFDictionaryRef)@{(id)kAXTrustedCheckOptionPrompt:@YES})) {
+            fprintf(stderr,"Enable MatiQ Voice.app in System Settings > Privacy & Security > Accessibility, then return and click Check keyboard access again. Add the installed app, not this button or the mac-keys executable.\n"); return 77;
+        }
         pressed=[NSMutableSet new]; swallowed=[NSMutableSet new]; bindings=[NSArray new];
         CGEventMask mask=CGEventMaskBit(kCGEventKeyDown)|CGEventMaskBit(kCGEventKeyUp)|CGEventMaskBit(kCGEventFlagsChanged);
         tap=CGEventTapCreate(kCGSessionEventTap,kCGHeadInsertEventTap,kCGEventTapOptionDefault,mask,keyboard,NULL);
-        if(!tap) { fprintf(stderr,"Allow MatiQ Voice in Privacy & Security > Accessibility, then check keyboard access again. macOS may also request Input Monitoring.\n"); return 77; }
+        if(!tap) { if(requestAccess) CGRequestListenEventAccess(); fprintf(stderr,"Keyboard listening could not start. Enable MatiQ Voice.app in Privacy & Security > Accessibility and Input Monitoring, quit and reopen the app, then check keyboard access again.\n"); return 77; }
         CFRunLoopSourceRef source=CFMachPortCreateRunLoopSource(NULL,tap,0);
         CFRunLoopAddSource(CFRunLoopGetMain(),source,kCFRunLoopCommonModes); CGEventTapEnable(tap,true);
         dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED,0),^{

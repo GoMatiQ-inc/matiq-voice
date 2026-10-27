@@ -14,14 +14,14 @@ class Keyboard {
     const map=keyMap(this.platform);
     this.child.stdin.write(JSON.stringify({bindings:Object.values(this.router.bindings).map(keys=>keys.map(key=>map[key])),learning:Boolean(this.router.recording)})+'\n');
   }
-  async start() {
+  async start({requestAccess=false}={}) {
     if(this.ready) return;
     if(this.starting) return this.starting;
-    this.starting=this.open().finally(()=>{this.starting=null;}); return this.starting;
+    this.starting=this.open(requestAccess).finally(()=>{this.starting=null;}); return this.starting;
   }
-  open() {
+  open(requestAccess=false) {
     return new Promise((resolve,reject)=>{
-      const child=this.platform==='darwin'?this.spawnProcess(path.join(this.engineDir,'mac-keys'),[],{windowsHide:true}):this.spawnProcess('powershell.exe',['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',path.join(this.nativeDir,'windows-keys.ps1')],{windowsHide:true});
+      const child=this.platform==='darwin'?this.spawnProcess(path.join(this.engineDir,'mac-keys'),requestAccess?['--request-access']:[],{windowsHide:true}):this.spawnProcess('powershell.exe',['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',path.join(this.nativeDir,'windows-keys.ps1')],{windowsHide:true});
       this.child=child;let stderr='',settled=false,failed=false;
       const lines=createInterface({input:child.stdout});
       const fail=message=>{ if(this.child!==child||failed)return;failed=true;clearTimeout(timeout);this.ready=false;this.error=message;clearTimeout(this.timer);this.router.cancelRecord();this.emit({type:'dictation-stop'});this.emit({type:'binding-cancelled',message});this.emit({type:'keyboard-status',ready:false,error:message});if(!settled){settled=true;reject(new Error(message));}child.kill(); };

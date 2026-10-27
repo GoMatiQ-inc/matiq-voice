@@ -316,3 +316,6 @@ try {
   if (!snapshot.shortcutReady) message('Background keyboard access is unavailable. Open Settings and check keyboard access.');
   if (!snapshot.setup.completed) openSetup();
 } catch (error) { showError(error); }
+
+$('show-app').hidden=navigator.platform.indexOf('Mac')===-1;
+$('show-app').onclick=()=>api.showApp().catch(showError);

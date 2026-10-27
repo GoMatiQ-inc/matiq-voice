@@ -107,3 +107,27 @@ inferred from those fixture tests.
 - Developer ID signing/notarization, Windows signing, privacy/support pages and
   provider external verification are required before marketing a production
   release. Development installers are not distribution-trusted releases.
+
+## Permission recovery update (2026-10-27)
+
+- 29 Node tests pass, including native request flags and recovery after denial.
+- The updated macOS helper compiles; native callback fixtures pass.
+- Check keyboard access waits for an Accessibility grant before retrying and
+  requests access from the native helper on an explicit click. Startup does
+  not prompt. Event-tap failure opens Input Monitoring with recovery guidance.
+- Show app in Finder reveals the actual installed app for the permission picker.
+- Physical keyboard permission recovery on the MacBook remains a manual gate.
+  These checks do not prove that the reported macOS permission issue is resolved.
+
+- A fresh macOS arm64 source build installs with `npm ci`, compiles the pinned
+  engine, passes 29 unit tests and packages with a valid ad-hoc signature
+  without private OAuth configuration or Apple developer credentials.
+- The fresh MacBook desktop E2E run passed three setup journeys, then stopped
+  at OS Keychain encryption during fixture OAuth. This remote session did not
+  qualify OAuth storage; no plaintext workaround was introduced. The earlier
+  13-journey result above belongs to the prior qualified development-host run.
+
+- Fresh unconfigured packaged speech and ONNX speaker-inference tests pass on
+  the MacBook with an isolated profile. The native keyboard tap reports ready
+  in that test process; physical typing and the installed-app permission picker
+  remain separate checks.

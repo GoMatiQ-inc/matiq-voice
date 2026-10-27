@@ -38,3 +38,14 @@ test('keyboard stream reports permission failure and stops a held dictation on h
   await keyboard.start();child.stdout.write('{"key":61,"down":true}\n');child.stderr.write('Enable Accessibility');child.stdin.emit('error',new Error('Enable Accessibility'));child.stdout.write('{"ready":true}\n');child.emit('close',77);
   assert.equal(keyboard.ready,false);assert.match(keyboard.error,/Accessibility/);assert.ok(events.some(e=>e.type==='dictation-stop'));keyboard.stop();
 });
+
+test('native permission requests happen only on explicit access checks and can retry after denial',async()=>{
+  const calls=[];
+  const keyboard=new Keyboard({engineDir:'.',nativeDir:'.',bindings:{toggle:[],hold:[]},emit:()=>{},platform:'darwin',spawnProcess:(command,args)=>{
+    calls.push(args);const child=new EventEmitter();child.stdout=new PassThrough();child.stderr=new PassThrough();child.stdin=new PassThrough();child.kill=()=>{};
+    queueMicrotask(()=>{if(calls.length===1){child.stderr.write('Enable Accessibility');child.emit('close',77);}else child.stdout.write('{"ready":true}\n');});return child;
+  }});
+  await assert.rejects(keyboard.start(),/Accessibility/);
+  await keyboard.start({requestAccess:true});
+  assert.deepEqual(calls,[[],['--request-access']]);assert.equal(keyboard.ready,true);keyboard.stop();
+});

@@ -1,7 +1,7 @@
 {
   "name": "matiq-voice",
   "productName": "MatiQ Voice",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "description": "Private English dictation and meeting notes by MatiQ.",
   "author": "MatiQ Inc",
@@ -30,7 +30,9 @@
     "files": [
       "src/**/*",
       "package.json",
-      "config/oauth.json"
+      "config/oauth.json",
+      "LICENSE",
+      "NOTICE"
     ],
     "extraResources": [
       {
@@ -40,7 +42,9 @@
       {
         "from": "native",
         "to": "native",
-        "filter": ["*.ps1"]
+        "filter": [
+          "*.ps1"
+        ]
       }
     ],
     "beforePack": "./scripts/check-package.cjs",
@@ -84,5 +88,6 @@
   },
   "dependencies": {
     "sherpa-onnx-node": "2.0.0"
-  }
+  },
+  "license": "PolyForm-Noncommercial-1.0.0"
 }

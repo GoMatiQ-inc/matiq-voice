@@ -51,7 +51,7 @@ See [the full behavior and privacy contract](docs/PRODUCT.md).
 
 ## Develop
 
-Node 22+, CMake and a native C/C++ compiler are required to build the engine.
+Node 22+, npm, Git, CMake, tar and a native C/C++ compiler are required to build the engine.
 On Mac use Xcode command-line tools; on Windows use Visual Studio 2022 C++ Build
 Tools and Windows SDK. Runtime targets are macOS 14.2+ and Windows 10+ on x64 or
 arm64; qualify an actual architecture before advertising support for it.
@@ -60,22 +60,44 @@ arm64; qualify an actual architecture before advertising support for it.
 npm ci
 npm run engine:build
 npm test
-npm start
+npm run package
+# Install the generated app from dist/, then open it and complete setup.
+# npm start is also available for UI development.
 ```
 
-Use the shared Mac's storage guard for installs/builds/tests (approximate peak
-reservations: dependencies 4 GiB, engine build 2 GiB, E2E 1 GiB, packaging 3 GiB).
+Allow several GB of free disk space for dependencies, engine compilation and packaging.
 The engine is pinned whisper.cpp; speaker inference uses packaged sherpa-onnx
 2.0.0 native libraries with verified local ONNX models. Source/font/model
 licenses and attributions are retained in `src/ui/assets/` and bundled engine.
 
+## Local builds and signing
+
+A fresh clone builds without an Apple developer account, private MatiQ files or
+OAuth registrations. Speech models are downloaded during setup, not committed.
+Install the packaged Mac app before granting OS permissions: `npm start` runs
+inside Electron, so macOS may show Electron rather than MatiQ Voice. Add the
+installed `.app` to Accessibility and, if requested, Input Monitoring. Use
+Settings → Show app in Finder to locate it; after changing permissions, quit
+and reopen the app. After replacing an ad-hoc build, macOS can require removing
+and re-adding the installed app in those lists. Never disable Gatekeeper globally.
+
+`npm run package` uses ad-hoc signing on Mac and needs no paid Apple account.
+MatiQ official downloads must use Developer ID signing and Apple notarization
+through `npm run package:release`. Local builds and forks never receive MatiQ
+signing keys. A fork distributed with Developer ID trust needs its own signing
+identity and notarization credentials. The current installed development build
+is ad-hoc signed, not a notarized public release.
+
 ## OAuth owned by MatiQ
 
-Customers should never create app registrations. Configure the real native
+Official-build customers should never create app registrations. Configure the real native
 Microsoft and Google registrations at build time with `npm run oauth:configure`.
 Read [OAUTH.md](docs/OAUTH.md) for scopes, redirects, token protection, provider
 verification, and the distinction between calendar connection and raw media.
-A build with missing registrations reports that explicitly. No real credentials
+A build without registrations still supports local dictation and attended
+meeting recording; calendar connections report that they are unavailable.
+Fork maintainers can provide their own registrations using the documented
+build variables. No real credentials
 are fabricated in tests or committed to this repository.
 
 ## Test and package
@@ -117,4 +139,16 @@ are external platform steps, not claims an automated fixture can prove.
 - `scripts/e2e-focus.mjs`: native insertion and destination-change checks.
 
 The source checkout retains its original `verbatim-dictation` folder name;
-the distributed product and private GitHub repository are MatiQ Voice.
+the distributed product and GitHub repository are MatiQ Voice.
+
+## License
+
+MatiQ-authored code is source available under [PolyForm Noncommercial 1.0.0](LICENSE).
+Noncommercial use, modification and redistribution are permitted under those
+terms. Preserve [the required MatiQ attribution notice](NOTICE) and the license
+when sharing copies or modifications. Commercial use, including use within a
+for-profit business, requires a separate license from MatiQ Inc. The license
+expressly permits certain nonprofit and public institutions; see its full terms.
+It is not an OSI open-source license because it restricts commercial use.
+Third-party components keep their own licenses; MatiQ branding does not imply
+endorsement of a fork. MatiQ Inc can separately license its own software commercially.

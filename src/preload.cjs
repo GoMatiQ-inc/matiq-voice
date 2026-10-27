@@ -1,7 +1,7 @@
 const {contextBridge, ipcRenderer} = require('electron');
 const invoke = channel => (...args) => ipcRenderer.invoke(channel, ...args);
 contextBridge.exposeInMainWorld('matiqVoice', {
-  recordBinding: invoke('binding-record'), cancelBinding: invoke('binding-cancel'), enableKeyboard: invoke('keyboard-enable'),
+  recordBinding: invoke('binding-record'), cancelBinding: invoke('binding-cancel'), enableKeyboard: invoke('keyboard-enable'), showApp: invoke('show-app'),
   status: invoke('status'), settings: invoke('settings'), download: invoke('download'),
   begin: invoke('begin'), recordingReady: invoke('recording-ready'), transcribe: invoke('transcribe'),
   retry: invoke('retry'), cancel: invoke('cancel'), copy: invoke('copy'), clear: invoke('clear'),

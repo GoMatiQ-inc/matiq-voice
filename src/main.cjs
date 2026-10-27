@@ -159,11 +159,25 @@ async function start(options) {
     keyboard.record(mode);
   });
   handle('binding-cancel', () => keyboard.cancelRecord());
+  handle('show-app', () => {
+    if (process.platform !== 'darwin') throw new Error('Use the installed Mac app when adding macOS permissions.');
+    shell.showItemInFolder(path.resolve(app.getPath('exe'), '../../..'));
+  });
   handle('keyboard-enable', async () => {
     if (process.platform === 'darwin' && !systemPreferences.isTrustedAccessibilityClient(true)) {
       await shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility');
+      notice('Turn on MatiQ Voice in Accessibility, then return and click Check keyboard access again. Use Show app in Finder to locate the installed app for the + picker.');
+      return {ready:false};
     }
-    await keyboard.start(); return {ready:keyboard.ready};
+    try { await keyboard.start({requestAccess:true}); }
+    catch (error) {
+      if (process.platform === 'darwin') {
+        const pane=error.message.includes('Add the installed app')?'Privacy_Accessibility':'Privacy_ListenEvent';
+        await shell.openExternal(`x-apple.systempreferences:com.apple.preference.security?${pane}`);
+      }
+      throw error;
+    }
+    return {ready:keyboard.ready};
   });
   handle('download', async () => {
     if (state !== 'idle') throw new Error('Finish the current operation first.');
