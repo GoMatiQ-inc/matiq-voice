@@ -8,7 +8,7 @@ const {inspectHardware} = require('./hardware.cjs');
 const {SPEAKER_MODELS, downloadAsset} = require('./assets.cjs');
 const {EncryptedTokenStore, Connections, meetingURL} = require('./oauth.cjs');
 const {MeetingStore} = require('./meetings.cjs');
-const {captureTarget} = require('./input.cjs');
+const {captureTarget,readPasteAccess} = require('./input.cjs');
 const {Keyboard} = require('./keyboard.cjs');
 
 function launch(options = {}) {
@@ -126,7 +126,12 @@ async function start(options) {
     for (const asset of SPEAKER_MODELS) { try { if ((await fs.stat(path.join(modelDir, asset.file))).size !== asset.bytes) speakerReady = false; } catch (error) { if (error.code !== 'ENOENT') throw error; speakerReady = false; } }
     return {modelReady, engineReady, speakerReady};
   }
-  const permissionStatus = () => ({microphone: systemPreferences.getMediaAccessStatus('microphone'), accessibility: process.platform === 'darwin' ? systemPreferences.isTrustedAccessibilityClient(false) : true});
+  async function permissionStatus() {
+    const microphone=systemPreferences.getMediaAccessStatus('microphone');
+    if(process.platform!=='darwin') return {microphone,accessibility:true};
+    try {return {microphone,...await readPasteAccess(path.join(engineDir,'mac-input'))};}
+    catch(error) {return {microphone,accessibility:false,pasteError:`Could not check native paste access: ${error.message}`};}
+  }
   async function input() {
     if (process.platform === 'darwin') return captureTarget(path.join(engineDir, 'mac-input'), ['session']);
     const script = app.isPackaged ? path.join(process.resourcesPath, 'native', 'windows-input.ps1') : path.join(__dirname, '..', 'native', 'windows-input.ps1');
@@ -145,7 +150,7 @@ async function start(options) {
     finally { operation = null; target?.cancel(); target = null; setState('idle'); }
   }
   handle('status', async () => ({state, settings, models: MODELS, maxSeconds: MAX_SECONDS, lastTranscript, canRetry: Boolean(lastAudio), shortcutReady, keyboardError: keyboard.error, startupNotice, platform: process.platform, packaged: app.isPackaged, installation:{version:app.getVersion(),path:app.isPackaged?app.getPath('exe'):app.getAppPath()},
-    hardware, setup, permissions: permissionStatus(), connections: await connections.status(), activeMeeting, ...(await ready())}));
+    hardware, setup, permissions: await permissionStatus(), connections: await connections.status(), activeMeeting, ...(await ready())}));
   handle('settings', async value => {
     if (state !== 'idle' || savingSettings) throw new Error('Wait for the current operation or preference save to finish.');
     savingSettings = true;
@@ -168,7 +173,7 @@ async function start(options) {
     shell.showItemInFolder(path.resolve(app.getPath('exe'), '../../..'));
   });
   handle('keyboard-enable', async () => {
-    if (process.platform === 'darwin' && !systemPreferences.isTrustedAccessibilityClient(true)) {
+    if (process.platform === 'darwin' && !(await readPasteAccess(path.join(engineDir,'mac-input'),{request:true})).accessibility) {
       await shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility');
       notice('Turn on MatiQ Voice in Accessibility, then return and click Check keyboard access again. Use Show app in Finder to locate the installed app for the + picker.');
       return {ready:false};
@@ -200,7 +205,7 @@ async function start(options) {
   handle('setup-complete', async () => {
     const availability = await ready();
     if (hardware.issues.length || !availability.engineReady || !availability.modelReady || !availability.speakerReady || !setup.microphoneTested) throw new Error('Complete the device, download, and microphone checks before finishing setup.');
-    if (settings.autoPaste && !permissionStatus().accessibility) throw new Error('Grant Accessibility permission or turn off automatic paste before finishing setup.');
+    if (settings.autoPaste && !(await permissionStatus()).accessibility) throw new Error('Grant Accessibility permission or turn off automatic paste before finishing setup.');
     setup.completed = true; setup.permissionsReviewed = true; setup.version = 1; await saveJSON(setupFile, setup); return setup;
   });
   handle('login-at-startup', async enabled => { if (typeof enabled !== 'boolean' || !app.isPackaged) throw new Error('Launch at login is available in the installed MatiQ Voice app.'); app.setLoginItemSettings({openAtLogin: enabled}); setup.launchAtLogin = enabled; await saveJSON(setupFile, setup); });
@@ -223,7 +228,7 @@ async function start(options) {
   handle('cancel', () => { generation++; if (activeMeeting && state !== 'meeting-processing') throw new Error('Stop meeting recording to save its audio.'); if (operation) { setState('cancelling'); operation.abort(); } else if (worker) worker.kill(); else setState('idle'); lastAudio = null; target?.cancel(); target = null; });
   handle('copy', () => { if (!lastTranscript) throw new Error('No transcript is available.'); clipboard.writeText(lastTranscript); });
   handle('clear', () => { if (state !== 'idle') throw new Error('Finish the current operation before clearing.'); lastTranscript = ''; lastAudio = null; send({type: 'transcript', text: ''}); updateTray(); });
-  handle('accessibility', async () => { if (process.platform === 'darwin') { systemPreferences.isTrustedAccessibilityClient(true); await shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility'); } else notice('Windows can reject insertion into elevated or protected apps. Use Copy when necessary.'); });
+  handle('accessibility', async () => { if (process.platform === 'darwin') { await readPasteAccess(path.join(engineDir,'mac-input'),{request:true}); await shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility'); } else notice('Windows can reject insertion into elevated or protected apps. Use Copy when necessary.'); });
   handle('oauth-connect', async id => { if (state !== 'idle') throw new Error('Finish recording before connecting an account.'); const result = await connections.connect(id); send({type: 'connections', connections: result}); return result; });
   handle('oauth-cancel', id => connections.cancel(id));
   handle('oauth-disconnect', async id => { const result = await connections.disconnect(id); send({type: 'connections', connections: await connections.status()}); return result; });

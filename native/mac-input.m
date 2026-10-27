@@ -14,6 +14,11 @@ static AXError focusedElement(AXUIElementRef system, CFTypeRef *element) {
 
 int main(int argc, const char *argv[]) {
     @autoreleasepool {
+        if (argc == 2 && (strcmp(argv[1], "permissions") == 0 || strcmp(argv[1], "request-permissions") == 0)) {
+            BOOL request=strcmp(argv[1], "request-permissions")==0;
+            BOOL trusted=AXIsProcessTrustedWithOptions((CFDictionaryRef)@{(id)kAXTrustedCheckOptionPrompt:@(request)});
+            printf("{\"accessibility\":%s}\n",trusted?"true":"false"); return 0;
+        }
         if (argc == 2 && strcmp(argv[1], "session") == 0) {
             if (!AXIsProcessTrusted()) {
                 fprintf(stderr, "Enable MatiQ Voice in Privacy & Security > Accessibility. Use Copy until permission is granted.\n"); return 77;

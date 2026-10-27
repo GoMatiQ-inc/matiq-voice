@@ -1,4 +1,5 @@
-const {spawn} = require('node:child_process');
+const {spawn,execFile} = require('node:child_process');
+const execFileAsync=require('node:util').promisify(execFile);
 const {createInterface} = require('node:readline');
 
 function captureTarget(executable, args) {
@@ -27,4 +28,10 @@ function captureTarget(executable, args) {
     });
   });
 }
-module.exports = {captureTarget};
+async function readPasteAccess(executable,{request=false,run=execFileAsync}={}) {
+  const {stdout}=await run(executable,[request?'request-permissions':'permissions'],{timeout:5000,maxBuffer:1024,windowsHide:true});
+  const result=JSON.parse(stdout);
+  if(typeof result.accessibility!=='boolean') throw new Error('Paste helper returned an invalid permission status. Reinstall MatiQ Voice.');
+  return {accessibility:result.accessibility};
+}
+module.exports = {captureTarget,readPasteAccess};

@@ -86,7 +86,9 @@ inside Electron, so macOS may show Electron rather than MatiQ Voice. Add the
 installed `.app` to Accessibility and, if requested, Input Monitoring. Use
 Settings → Show app in Finder to locate it; after changing permissions, quit
 and reopen the app. After replacing an ad-hoc build, macOS can require removing
-and re-adding the installed app in those lists. Never disable Gatekeeper globally.
+and re-adding the installed app in those lists. Paste permission checks run a
+fresh native helper so they reflect the process that performs insertion, rather
+than Electron’s cached trust result. Never disable Gatekeeper globally.
 
 The Mac icon is committed as `build/icon.icns`, generated from the shared PNG
 with `npm run icons:mac` using Apple’s icon utilities. The installer check

@@ -131,3 +131,27 @@ inferred from those fixture tests.
   the MacBook with an isolated profile. The native keyboard tap reports ready
   in that test process; physical typing and the installed-app permission picker
   remain separate checks.
+
+## Installer, Finder icon and native permission checks (2026-10-27)
+
+- Mac PKG installation is restricted to system `/Applications`, with bundle
+  relocation disabled. Its preinstall guard rejected a running app and returned
+  success after normal Quit; it never terminates a recording process.
+- The MacBook's actual Installer receipt confirms version 0.3.2 at Applications.
+  Its former home-directory copy is removed, and user profile files are retained.
+- Automatic icon conversion corrupted the embedded 16-pixel representation;
+  the larger icons were correct. A native-generated ICNS now renders correctly
+  at 16 pixels. Installer checks extract the payload and require that exact icon.
+- Version 0.3.3 passes 30 Node tests, installer checks, packaged native speech and
+  speaker inference, and real native field insertion/Unicode selection/rejection
+  checks on macOS arm64. Paste access now probes a fresh native input helper;
+  errors are exposed separately from denied access and startup never prompts.
+- The new native-helper test covers denial, permission refresh, explicit request
+  flags and failed/invalid probes. Installed Launch Services permission approval
+  and physical shortcut/paste use still require interactive acceptance.
+- Production Mac release commands require Developer ID Application and Developer
+  ID Installer identities and notarization credentials. The available Apple
+  Development identity is not a substitute. Current artifacts remain ad-hoc
+  development builds; no trusted public-distribution claim is made.
+- Windows NSIS preserves profile data and creates a Start menu shortcut. Actual
+  Windows install/upgrade and native permission qualification remain outstanding.
