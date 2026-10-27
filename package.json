@@ -1,7 +1,7 @@
 {
   "name": "matiq-voice",
   "productName": "MatiQ Voice",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "private": true,
   "description": "Private English dictation and meeting notes by MatiQ.",
   "author": "MatiQ Inc",
@@ -17,7 +17,8 @@
     "oauth:configure": "node scripts/configure-oauth.cjs",
     "package:release": "node scripts/release.cjs",
     "test:focus": "node scripts/e2e-focus.mjs",
-    "test:packaged": "node scripts/e2e-packaged.mjs"
+    "test:packaged": "node scripts/e2e-packaged.mjs",
+    "test:installer": "node scripts/check-mac-installer.mjs"
   },
   "devDependencies": {
     "electron": "45.0.0",
@@ -56,6 +57,7 @@
       "identity": "-",
       "category": "public.app-category.productivity",
       "target": [
+        "pkg",
         "dmg",
         "zip"
       ],
@@ -76,7 +78,10 @@
     "nsis": {
       "oneClick": false,
       "perMachine": false,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "MatiQ Voice",
+      "deleteAppDataOnUninstall": false
     },
     "asarUnpack": [
       "node_modules/**/*.node",
@@ -84,7 +89,17 @@
       "node_modules/**/*.dll",
       "node_modules/**/*.so*"
     ],
-    "icon": "src/ui/assets/app-icon.png"
+    "icon": "src/ui/assets/app-icon.png",
+    "pkg": {
+      "installLocation": "/Applications",
+      "allowAnywhere": false,
+      "allowCurrentUserHome": false,
+      "allowRootDirectory": true,
+      "isRelocatable": false,
+      "identity": null,
+      "scripts": "pkg-scripts",
+      "welcome": "build/installer-welcome.html"
+    }
   },
   "dependencies": {
     "sherpa-onnx-node": "2.0.0"

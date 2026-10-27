@@ -32,6 +32,8 @@ function paint() {
   $('retry').hidden = !snapshot.canRetry;
   $('model-status').textContent = snapshot.modelReady && snapshot.speakerReady ? 'Speech and speaker models are installed. Recognition can run offline.' : 'Download the selected speech model and speaker models before completing setup.';
   $('launch-login').disabled = !snapshot.packaged;
+  $('quit-app').disabled = !idle || starting;
+  $('installation').textContent = `Version ${snapshot.installation.version} · ${snapshot.installation.path}`;
   $('shortcut').textContent = `Toggle: ${bindingLabel(snapshot.settings.bindings.toggle)} · Hold: ${bindingLabel(snapshot.settings.bindings.hold)}`;
   for (const mode of ['toggle','hold']) $(`binding-${mode}`).textContent=bindingLabel(snapshot.settings.bindings[mode]);
   $('shortcut-status').textContent = snapshot.shortcutReady ? 'Keyboard access active. Bindings work while MatiQ Voice is in the background.' : snapshot.keyboardError || 'Enable keyboard access to use background bindings.';
@@ -319,3 +321,5 @@ try {
 
 $('show-app').hidden=navigator.platform.indexOf('Mac')===-1;
 $('show-app').onclick=()=>api.showApp().catch(showError);
+
+$('quit-app').onclick=()=>api.quit().catch(showError);

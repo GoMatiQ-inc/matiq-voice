@@ -8,7 +8,12 @@ qualification are separate release gates in [VALIDATION.md](docs/VALIDATION.md).
 
 ## Use
 
-Install the app for your OS/architecture and follow first-run setup:
+On Mac, open the `.pkg` installer for your architecture; it installs to
+`/Applications` and preserves your existing profile. Quit the running app before
+upgrading. DMG/ZIP builds remain available for development; drag the DMG app
+into its Applications shortcut rather than running it from the disk image.
+On Windows, run the NSIS `.exe` installer; it creates a Start menu shortcut and
+keeps user data when uninstalling. Then follow first-run setup:
 
 1. Check this computer's CPU, memory, disk and bundled engine.
 2. Download/verify the recommended English speech and speaker-label models.
@@ -74,6 +79,8 @@ licenses and attributions are retained in `src/ui/assets/` and bundled engine.
 
 A fresh clone builds without an Apple developer account, private MatiQ files or
 OAuth registrations. Speech models are downloaded during setup, not committed.
+The Mac PKG installs only to `/Applications` (home-directory installation and
+bundle relocation are disabled). It refuses to overwrite a running app.
 Install the packaged Mac app before granting OS permissions: `npm start` runs
 inside Electron, so macOS may show Electron rather than MatiQ Voice. Add the
 installed `.app` to Accessibility and, if requested, Input Monitoring. Use
@@ -83,7 +90,9 @@ and re-adding the installed app in those lists. Never disable Gatekeeper globall
 
 `npm run package` uses ad-hoc signing on Mac and needs no paid Apple account.
 MatiQ official downloads must use Developer ID signing and Apple notarization
-through `npm run package:release`. Local builds and forks never receive MatiQ
+through `npm run package:release`. Mac release builds require both
+`CSC_NAME` (Developer ID Application) and `CSC_INSTALLER_NAME` (Developer ID
+Installer), plus the documented Apple notarization environment variables. Local builds and forks never receive MatiQ
 signing keys. A fork distributed with Developer ID trust needs its own signing
 identity and notarization credentials. The current installed development build
 is ad-hoc signed, not a notarized public release.

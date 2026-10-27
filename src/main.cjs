@@ -80,6 +80,10 @@ async function start(options) {
       if (['preparing', 'recording', 'processing', 'meeting-preparing', 'meeting-recording', 'meeting-processing'].includes(state)) hud.showInactive(); else hud.hide();
     }
   }
+  if (process.platform === 'darwin') Menu.setApplicationMenu(Menu.buildFromTemplate([
+    {label:'MatiQ Voice',submenu:[{role:'about'},{label:'Settings…',accelerator:'Command+,',click:()=>{show();send({type:'navigate',page:'settings'});}},{type:'separator'},{role:'quit',label:'Quit MatiQ Voice'}]},
+    {role:'editMenu'},{role:'windowMenu'}
+  ]));
   tray.on('double-click', show); updateTray();
   win.on('close', event => { if (!quitting) { event.preventDefault(); win.hide(); } });
   app.on('activate', show); app.on('second-instance', show);
@@ -140,7 +144,7 @@ async function start(options) {
     } catch (error) { if (!controller.signal.aborted) { notice(`Recognition failed: ${error.message} Use Retry; your audio is retained in memory.`); throw error; } }
     finally { operation = null; target?.cancel(); target = null; setState('idle'); }
   }
-  handle('status', async () => ({state, settings, models: MODELS, maxSeconds: MAX_SECONDS, lastTranscript, canRetry: Boolean(lastAudio), shortcutReady, keyboardError: keyboard.error, startupNotice, platform: process.platform, packaged: app.isPackaged,
+  handle('status', async () => ({state, settings, models: MODELS, maxSeconds: MAX_SECONDS, lastTranscript, canRetry: Boolean(lastAudio), shortcutReady, keyboardError: keyboard.error, startupNotice, platform: process.platform, packaged: app.isPackaged, installation:{version:app.getVersion(),path:app.isPackaged?app.getPath('exe'):app.getAppPath()},
     hardware, setup, permissions: permissionStatus(), connections: await connections.status(), activeMeeting, ...(await ready())}));
   handle('settings', async value => {
     if (state !== 'idle' || savingSettings) throw new Error('Wait for the current operation or preference save to finish.');
@@ -272,7 +276,7 @@ async function start(options) {
     const text = [`# ${meeting.title}`, '', '## Transcript', ...meeting.segments.map(segment => `${Math.floor(segment.startMs / 60000)}:${String(Math.floor(segment.startMs / 1000) % 60).padStart(2, '0')} ${meeting.speakers[segment.speaker] || 'Unassigned'}: ${segment.text}`), '', '## Personal notes', meeting.personalNotes, '', '## Extracted notes', ...(meeting.notes?.actions || []).map(note => `- ${note.text} [${Math.floor(note.startMs / 1000)}s]`) ].join('\n');
     await fs.writeFile(result.filePath, text, {mode: 0o600}); return true;
   });
-  handle('quit', () => { quitting = true; app.quit(); });
+  handle('quit', () => app.quit());
   try { await keyboard.start(); } catch (error) { startupNotice += ` ${error.message}`; }
   if (!globalShortcut.register('CommandOrControl+Alt+Backspace', () => send({type: 'cancel'}))) startupNotice += ' The cancel shortcut is unavailable. Use the app controls.';
   await hud.loadURL(hudURL); await win.loadURL(pageURL);
