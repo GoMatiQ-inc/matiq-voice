@@ -88,6 +88,11 @@ Settings → Show app in Finder to locate it; after changing permissions, quit
 and reopen the app. After replacing an ad-hoc build, macOS can require removing
 and re-adding the installed app in those lists. Never disable Gatekeeper globally.
 
+The Mac icon is committed as `build/icon.icns`, generated from the shared PNG
+with `npm run icons:mac` using Apple’s icon utilities. The installer check
+verifies that packaging retains this file; automatic PNG-to-ICNS conversion
+previously corrupted the smallest Finder icon.
+
 `npm run package` uses ad-hoc signing on Mac and needs no paid Apple account.
 MatiQ official downloads must use Developer ID signing and Apple notarization
 through `npm run package:release`. Mac release builds require both

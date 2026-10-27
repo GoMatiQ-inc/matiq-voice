@@ -18,7 +18,8 @@
     "package:release": "node scripts/release.cjs",
     "test:focus": "node scripts/e2e-focus.mjs",
     "test:packaged": "node scripts/e2e-packaged.mjs",
-    "test:installer": "node scripts/check-mac-installer.mjs"
+    "test:installer": "node scripts/check-mac-installer.mjs",
+    "icons:mac": "node scripts/build-mac-icon.mjs"
   },
   "devDependencies": {
     "electron": "45.0.0",
@@ -68,7 +69,8 @@
         "NSMicrophoneUsageDescription": "MatiQ Voice records speech when you start dictation or a meeting. Recognition runs on this device.",
         "NSAudioCaptureUsageDescription": "MatiQ Voice captures meeting audio from this computer only when you start meeting recording.",
         "NSScreenCaptureUsageDescription": "Choose the meeting screen to capture its audio. MatiQ Voice does not save screen video."
-      }
+      },
+      "icon": "build/icon.icns"
     },
     "win": {
       "target": [

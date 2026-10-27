@@ -23,8 +23,10 @@ try {
   assert.match(info,/relocatable="false"/,'Upgrades must not follow a moved copy into another folder.');
   assert.match(info,/<preinstall\b/,'Refuse replacement while the app is running.');
   assert.ok((await fs.stat(path.join(component,'Scripts','preinstall'))).mode & 0o111,'The packaged preinstall guard must be executable.');
+  const embeddedIcon=await fs.readFile(path.join(component,'Payload','MatiQ Voice.app','Contents','Resources','icon.icns'));
+  assert.ok(embeddedIcon.equals(await fs.readFile(path.join(root,'build/icon.icns'))),'Installer must retain the native-encoded icon, including its verified 16-pixel representation.');
   const files=run(['--payload-files',pkg]).trim().split('\n');
   assert.ok(files.includes('./MatiQ Voice.app/Contents/MacOS/MatiQ Voice'),'Package must contain the application executable.');
   assert.ok(files.every(file=>file==='.' || file==='./MatiQ Voice.app' || file.startsWith('./MatiQ Voice.app/')),'Installer must not write into user profiles or permission databases.');
-  console.log('Mac installer verified: /Applications only, relocation disabled, running-app guard present, application-only payload.');
+  console.log('Mac installer verified: /Applications only, relocation disabled, running-app guard present, application-only payload and native-encoded icon.');
 } finally {await fs.rm(temporary,{recursive:true,force:true});}
