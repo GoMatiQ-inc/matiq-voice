@@ -2,9 +2,15 @@ name: MatiQ Voice checks and installers
 on:
   push:
     branches: [main]
-    tags: ['v*']
+    tags: ['v*', '!v*-signing.*']
   pull_request:
   workflow_dispatch:
+    inputs:
+      signing:
+        description: Validate signed packages from a release-validation tag (no publication)
+        type: choice
+        options: [none, mac, windows, both]
+        default: none
 permissions:
   contents: read
 concurrency:
@@ -33,6 +39,14 @@ jobs:
           MATIQ_GOOGLE_CLIENT_ID: ${{ vars.MATIQ_GOOGLE_CLIENT_ID }}
           MATIQ_GOOGLE_DESKTOP_CLIENT_SECRET: ${{ secrets.MATIQ_GOOGLE_DESKTOP_CLIENT_SECRET }}
       - run: npm test
+      - name: Parse Windows signing verifier
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD 'scripts/verify-windows-signing.ps1'), [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count) { throw ($errors | Out-String) }
       - run: npm run engine:build
       - run: npm run test:e2e
       - run: npm run package
@@ -67,9 +81,93 @@ jobs:
             dist/*.pkg
             dist/*.exe
           if-no-files-found: error
-  release:
-    if: startsWith(github.ref, 'refs/tags/v')
+  signed:
+    if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-preview.')) || (github.event_name == 'workflow_dispatch' && inputs.signing != 'none')
     needs: desktop
+    environment: release-signing
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(inputs.signing == 'mac' && '["macos-latest"]' || inputs.signing == 'windows' && '["windows-latest"]' || '["macos-latest","windows-latest"]') }}
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Require trusted source merged into main
+        run: git merge-base --is-ancestor HEAD origin/main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --no-audit --no-fund
+      - run: npm run oauth:configure
+        env:
+          MATIQ_MICROSOFT_CLIENT_ID: ${{ vars.MATIQ_MICROSOFT_CLIENT_ID }}
+          MATIQ_GOOGLE_CLIENT_ID: ${{ vars.MATIQ_GOOGLE_CLIENT_ID }}
+          MATIQ_GOOGLE_DESKTOP_CLIENT_SECRET: ${{ secrets.MATIQ_GOOGLE_DESKTOP_CLIENT_SECRET }}
+      - run: npm run engine:build
+      - name: Authenticate Windows signer with OIDC
+        if: runner.os == 'Windows'
+        uses: azure/login@935127ca5bb3c4b02c9c2c10060028383878f33f # v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Sign and notarize Mac app and installer
+        if: runner.os == 'macOS'
+        run: npm run package:release
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          CSC_NAME: ${{ secrets.CSC_NAME }}
+          CSC_INSTALLER_LINK: ${{ secrets.CSC_INSTALLER_LINK }}
+          CSC_INSTALLER_KEY_PASSWORD: ${{ secrets.CSC_INSTALLER_KEY_PASSWORD }}
+          CSC_INSTALLER_NAME: ${{ secrets.CSC_INSTALLER_NAME }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      - name: Sign Windows app, native libraries and installer
+        if: runner.os == 'Windows'
+        run: npm run package:release
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          MATIQ_AZURE_SIGN_ENDPOINT: ${{ secrets.MATIQ_AZURE_SIGN_ENDPOINT }}
+          MATIQ_AZURE_SIGN_ACCOUNT: ${{ secrets.MATIQ_AZURE_SIGN_ACCOUNT }}
+          MATIQ_AZURE_SIGN_PROFILE: ${{ secrets.MATIQ_AZURE_SIGN_PROFILE }}
+          MATIQ_WINDOWS_PUBLISHER: ${{ secrets.MATIQ_WINDOWS_PUBLISHER }}
+      - name: Verify Mac installer payload
+        if: runner.os == 'macOS'
+        run: npm run test:installer
+      - name: Verify Mac signing, stapling and Gatekeeper acceptance
+        if: runner.os == 'macOS'
+        run: node scripts/verify-mac-signing.mjs
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          CSC_INSTALLER_NAME: ${{ secrets.CSC_INSTALLER_NAME }}
+      - name: Verify Windows publisher, Authenticode and timestamps
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/verify-windows-signing.ps1
+        env:
+          MATIQ_WINDOWS_PUBLISHER: ${{ secrets.MATIQ_WINDOWS_PUBLISHER }}
+      - run: npm run test:packaged
+      - uses: actions/upload-artifact@v4
+        with:
+          name: signed-installers-${{ runner.os }}-${{ runner.arch }}
+          retention-days: 7
+          path: |
+            dist/*.pkg
+            dist/*.exe
+            dist/*-signature.json
+          if-no-files-found: error
+  release:
+    if: always() && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && needs.desktop.result == 'success' && (contains(github.ref, '-preview.') || needs.signed.result == 'success')
+    needs: [desktop, signed]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -85,18 +183,22 @@ jobs:
           node-version: '22'
       - uses: actions/download-artifact@v4
         with:
-          pattern: release-installers-*
+          pattern: ${{ contains(github.ref, '-preview.') && 'release-installers-*' || 'signed-installers-*' }}
           merge-multiple: true
           path: release-assets
       - name: Validate downloads and generate checksums and notes
         run: node scripts/prepare-release.mjs release-assets
-      - name: Publish preview downloads
+        env:
+          MATIQ_RELEASE_SIGNED: ${{ contains(github.ref, '-preview.') && '0' || '1' }}
+      - name: Publish verified downloads
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
-        run: >-
-          gh release create "$RELEASE_TAG"
-          release-assets/*.pkg release-assets/*.exe release-assets/SHA256SUMS.txt
-          --verify-tag --prerelease
-          --title "MatiQ Voice $RELEASE_TAG (Preview)"
-          --notes-file release-assets/RELEASE_NOTES.md
+        run: |
+          flags=()
+          if [[ "$RELEASE_TAG" == *-preview.* ]]; then flags+=(--prerelease); fi
+          gh release create "$RELEASE_TAG" \
+            release-assets/*.pkg release-assets/*.exe release-assets/SHA256SUMS.txt \
+            --verify-tag "${flags[@]}" \
+            --title "MatiQ Voice $RELEASE_TAG" \
+            --notes-file release-assets/RELEASE_NOTES.md
