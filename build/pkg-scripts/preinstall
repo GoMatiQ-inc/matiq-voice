@@ -1,0 +1,7 @@
+#!/bin/sh
+# Never replace the executable while it may own an active recording.
+if /usr/bin/pgrep -f '[/]MatiQ Voice.app/Contents/MacOS/MatiQ Voice($| )' >/dev/null; then
+    echo "Quit MatiQ Voice from its app or menu-bar menu, finish any recording, then run this installer again." >&2
+    exit 1
+fi
+exit 0

@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.engine-build/
+.build-tools/
+.validation/
+config/oauth.json
+engine/*
+!engine/.gitkeep
+*.log
+.DS_Store

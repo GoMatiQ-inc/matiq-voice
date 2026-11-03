@@ -1,0 +1,59 @@
+MatiQ Voice No-Sale License 1.0
+
+Copyright 2026 MatiQ Inc (https://matiqinc.com).
+
+1. Scope and permission
+
+"Software" means the MatiQ-authored code and documentation in MatiQ Voice,
+including modified versions and portions incorporated into other software.
+Third-party components remain subject to their own licenses.
+
+Subject to these terms, permission is granted, free of charge, to use, copy,
+modify, and distribute the Software in source or executable form. Personal,
+educational, nonprofit, and internal business use are expressly permitted,
+including use by employees and contractors within a for-profit company.
+You may use the Software to create work products, including transcripts and
+notes, for your business or clients, and charge for those work products or
+your own work. Output does not become Software merely because it was created
+using the Software.
+
+2. No sale, paid access, hosting, or paid bundles
+
+You may not charge a fee or require other consideration for a copy of, a
+license to, access to, or use of the Software, including modified versions.
+You may not provide the Software to third parties as a paid hosted or managed
+service. You may not include the Software, or its functionality, in a product,
+service, subscription, or bundle for which a recipient must pay, even if the
+Software is described as a free component or has been modified or rebranded.
+These restrictions apply to source and executable distributions and to
+Software incorporated into another program. They do not prohibit internal
+business use or charging for work products as permitted in section 1.
+Charging specifically for access to the Software is prohibited even when
+that access also produces a transcript, note, or other output.
+
+3. Notices and redistribution
+
+Every distributed copy or substantial portion of the Software must retain
+this entire license and the MatiQ attribution in NOTICE. Modified versions
+must identify that they have been modified and must not imply endorsement
+by MatiQ Inc. Recipients must receive the Software subject to these same
+terms; you may not grant rights inconsistent with this license. No rights
+to MatiQ names, logos, or trademarks are granted, except to reproduce the
+required attribution and identify the origin of the Software.
+
+4. Separate permission
+
+Uses prohibited above require a separate written license from MatiQ Inc.
+This license does not restrict MatiQ Inc's ability to license code it owns
+under other terms. It does not alter licenses granted for earlier versions
+or override the separate licenses of third-party components.
+
+5. Warranty and liability
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
