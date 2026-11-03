@@ -189,3 +189,16 @@ inferred from those fixture tests.
   Real Mac notarization and Windows Public Trust identity/profile qualification
   must pass before signed downloads are claimed or published. Existing public
   preview assets remain unsigned/ad-hoc. See SIGNING.md.
+
+- Protected Mac preflight 41689073482 stopped before notarization: the v26
+  automatic keychain import supplied the P12 password to a keychain created
+  with a different random password. The following payload check rejected the
+  missing installer, so nothing was published. SDK exit hooks also exposed
+  that setting `exitCode` was insufficient; the release command now exits 1
+  explicitly on rejection.
+- The keychain workaround has mocked lifecycle tests for separate key/P12
+  passwords, successful asynchronous completion, import/signing failure,
+  environment/search-list restoration and temporary-file removal. The child
+  process regression proves packager failures stay nonzero even if an SDK
+  exit hook resets `exitCode`. All 46 Node tests pass under Linux. Real Mac
+  signing/notarization requires another protected preflight.
