@@ -1,0 +1,79 @@
+name: Publish verified Mac installer
+on:
+  workflow_dispatch:
+    inputs:
+      source_run:
+        description: Successful checks.yml run containing the verified signed Mac artifact
+        required: true
+        default: '41694057284'
+permissions:
+  contents: read
+concurrency: publish-mac-release
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify source run and download its tested Mac installer
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN: ${{ inputs.source_run }}
+        run: |
+          python3 - <<'PYTHON'
+          import hashlib, json, os, pathlib, re, subprocess
+          def gh(*args):
+              return subprocess.check_output(['gh', *args], text=True)
+          repo = os.environ['GITHUB_REPOSITORY']
+          run_id = os.environ['SOURCE_RUN']
+          assert re.fullmatch(r'[0-9]+', run_id), 'Provide a numeric Actions run ID.'
+          run = json.loads(gh('api', f'repos/{repo}/actions/runs/{run_id}'))
+          assert run['conclusion'] == 'success' and run['path'] == '.github/workflows/checks.yml', 'Source must be a successful checks.yml run.'
+          assert run['head_repository']['full_name'] == repo, 'Fork artifacts cannot be published.'
+          sha = run['head_sha']
+          subprocess.run(['git', 'merge-base', '--is-ancestor', sha, 'origin/main'], check=True)
+          jobs = json.loads(gh('api', f'repos/{repo}/actions/runs/{run_id}/jobs?per_page=100'))['jobs']
+          required = {'desktop (macos-latest)', 'desktop (windows-latest)', 'signed (macos-latest)'}
+          assert required <= {job['name'] for job in jobs if job['conclusion'] == 'success'}, 'Platform tests and protected Mac signing must all pass.'
+          version = json.loads(subprocess.check_output(['git', 'show', f'{sha}:package.json'], text=True))['version']
+          assert re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+', version), 'Publish a stable package version.'
+          gh('run', 'download', run_id, '--repo', repo, '--name', 'signed-installers-macOS-ARM64', '--dir', 'release-assets')
+          folder = pathlib.Path('release-assets')
+          name = f'MatiQ-Voice-{version}-mac-arm64.pkg'
+          assert {p.name for p in folder.iterdir()} == {name, 'mac-signature.json'}, 'Expected exactly the signed PKG and its verification report.'
+          digest = hashlib.sha256((folder/name).read_bytes()).hexdigest()
+          proof = json.loads((folder/'mac-signature.json').read_text())
+          assert proof['version'] == version and proof['artifact'] == name and proof['sha256'] == digest, 'Verification report must cover these exact installer bytes.'
+          assert proof['platform'] == 'darwin' and all(proof.get(k) is True for k in ['signed', 'notarized', 'stapled']) and proof.get('team'), 'Require Developer ID signatures and Apple notarization/stapling.'
+          (folder/'SHA256SUMS.txt').write_text(f'{digest}  {name}\n')
+          notes = f"""MatiQ Voice {version} — signed Apple Silicon Mac installer
+
+          Free local English dictation and meeting notes by [MatiQ Inc](https://matiqinc.com).
+
+          Download **{name}** below. Supports Apple Silicon (M1 or newer), macOS 14.2 or newer. Intel Macs are not supported by this installer.
+
+          The app, native engines and installer passed Developer ID signature verification, Apple notarization, stapling and Gatekeeper assessment. Packaged local transcription and both platform test jobs passed. [Verified build]({run['html_url']}); source commit `{sha}`.
+
+          Quit MatiQ Voice before upgrading. Open the PKG to install in Applications, then follow setup for local models, Microphone, Accessibility and keyboard access. Normal administrator and privacy permission prompts still apply. No compiler or developer account is required.
+
+          **Windows signing is awaiting Microsoft company verification.** This release contains only the verified Mac installer; the older Windows preview remains unsigned.
+
+          [Installation instructions](https://github.com/{repo}#download-and-install). Free personal and internal business use under the [No-Sale License](https://github.com/{repo}/blob/{sha}/LICENSE). Paid access, hosting and paid bundles require permission. Recognition can make mistakes; calendar and live meeting limitations remain documented in [VALIDATION.md](https://github.com/{repo}/blob/{sha}/docs/VALIDATION.md).
+          """
+          (folder/'RELEASE_NOTES.md').write_text(notes)
+          with open(os.environ['GITHUB_ENV'], 'a') as env:
+              env.write(f'RELEASE_TAG=v{version}\nSOURCE_SHA={sha}\n')
+          PYTHON
+      - name: Publish verified Mac download
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$RELEASE_TAG" release-assets/*.pkg release-assets/SHA256SUMS.txt \
+            --target "$SOURCE_SHA" --title "MatiQ Voice $RELEASE_TAG — signed Mac installer" \
+            --notes-file release-assets/RELEASE_NOTES.md --latest
