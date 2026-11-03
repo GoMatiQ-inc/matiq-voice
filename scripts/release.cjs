@@ -1,6 +1,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const {signingConfig} = require('./signing-config.cjs');
+const {withMacKeychain} = require('./mac-keychain.cjs');
 const directory = path.join(__dirname, '..');
 async function main() {
   const configFile = path.join(directory, 'config/oauth.json');
@@ -10,6 +11,8 @@ async function main() {
   const base = JSON.parse(fs.readFileSync(path.join(directory, 'package.json'), 'utf8')).build;
   const config = {...base, ...signing};
   for (const platform of ['mac', 'pkg', 'win']) if (signing[platform]) config[platform] = {...base[platform], ...signing[platform]};
-  await require('electron-builder').build({projectDir: directory, config, publish: 'never'});
+  const build = () => require('electron-builder').build({projectDir: directory, config, publish: 'never'});
+  if (process.platform === 'darwin') await withMacKeychain(process.env, build);
+  else await build();
 }
-main().catch(error => { console.error(error.message); process.exitCode = 1; });
+main().catch(error => { console.error(error.message); process.exit(1); });
