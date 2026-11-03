@@ -32,20 +32,18 @@ separate permission. This is **source available**, not OSI open source.
 
 ## Download and install
 
-The current download is **v0.3.4-preview.1**. It is an early public preview:
-macOS builds are ad-hoc signed and not Apple-notarized, the Mac installer is
-unsigned, and Windows builds are unsigned. Operating-system warnings are
-expected; managed work computers may prohibit installation. Production signing,
-live calendar/meeting qualification and wider hardware testing remain unfinished.
-See [validation and limitations](docs/VALIDATION.md).
-
-The signed-release pipeline is being qualified separately. The preview links
-below remain preview builds until verified signed downloads are published.
-See [installer signing and notarization](docs/SIGNING.md) for current requirements.
+The Mac download is **v0.3.4**, signed with MatiQ's Developer ID and
+Apple-notarized. Its app, native engines and installer passed signature,
+stapling and Gatekeeper checks. Windows remains the **unsigned
+v0.3.4-preview.1 preview** while Microsoft reviews company signing verification;
+Windows security warnings are expected. Live calendar/meeting qualification
+and wider hardware testing remain unfinished. See
+[validation and limitations](docs/VALIDATION.md) and
+[installer signing and notarization](docs/SIGNING.md).
 
 | Computer | Download | Minimum OS |
 |---|---|---|
-| Apple Silicon Mac: M1, M2, M3, M4 or newer | [Mac installer (.pkg)](https://github.com/GoMatiQ-inc/matiq-voice/releases/download/v0.3.4-preview.1/MatiQ-Voice-0.3.4-preview.1-mac-arm64.pkg) | macOS 14.2 |
+| Apple Silicon Mac: M1, M2, M3, M4 or newer | [Mac installer (.pkg)](https://github.com/GoMatiQ-inc/matiq-voice/releases/download/v0.3.4/MatiQ-Voice-0.3.4-mac-arm64.pkg) | macOS 14.2 |
 | Windows PC: Intel/AMD 64-bit | [Windows installer (.exe)](https://github.com/GoMatiQ-inc/matiq-voice/releases/download/v0.3.4-preview.1/MatiQ-Voice-0.3.4-preview.1-windows-x64.exe) | Windows 10 |
 
 Intel Mac and native Windows ARM installers are not included in this preview.
@@ -73,12 +71,9 @@ works offline. Optional calendar connections require internet access.
 4. Return to the app, check access again, and complete setup. If macOS requests
    a restart of the app, quit it from the menu bar and reopen it.
 
-Because this preview is not notarized, macOS may block the installer or app.
-If you choose to run it after verifying this repository and download, follow
-[Apple's app-specific guidance](https://support.apple.com/en-us/102445): after
-the blocked attempt, look in **System Settings → Privacy & Security** for
-**Open Anyway** and review the named app before confirming. Do not disable
-Gatekeeper globally. If your organization blocks installation, ask its IT team.
+The Mac installer above is signed and Apple-notarized. Normal administrator
+and privacy permission prompts still apply. If your organization blocks
+installation, ask its IT team; do not disable Gatekeeper globally.
 
 An old enabled permission entry can refer to a previous ad-hoc build. Remove
 only the MatiQ Voice entry, add the current `/Applications/MatiQ Voice.app`,

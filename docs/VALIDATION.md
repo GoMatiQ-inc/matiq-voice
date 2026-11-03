@@ -202,3 +202,18 @@ inferred from those fixture tests.
   process regression proves packager failures stay nonzero even if an SDK
   exit hook resets `exitCode`. All 46 Node tests pass under Linux. Real Mac
   signing/notarization requires another protected preflight.
+
+## Verified Mac release artifact
+
+- [Protected preflight 41694057284](https://github.com/GoMatiQ-inc/matiq-voice/actions/runs/41694057284)
+  passed on source `15eca1316c2d42f799bdb7832f5c0fd62787b2c7`:
+  both platform test/package jobs, Mac Developer ID app/native-engine and
+  Installer signatures, app and PKG Apple notarization, stapling, Gatekeeper
+  assessments, installer payload checks and packaged native inference.
+- The Mac-only publishing workflow retrieves that tested artifact and requires
+  a matching version, filename and SHA-256 in its native verification report.
+  It publishes no rebuilt binaries or unsigned fallback. This supersedes the
+  earlier pending Mac qualification notes above. Windows trusted signing is
+  still awaiting Microsoft organization validation; its public preview stays
+  unsigned. Privacy/admin permission prompts and live provider limitations
+  remain applicable.

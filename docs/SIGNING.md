@@ -72,3 +72,14 @@ Windows SmartScreen reputation is separate from Authenticode and may still warn
 for a newly signed application. Normal administrator, microphone, Accessibility
 and managed-device prompts also remain. Do not promise that signing removes
 every operating-system prompt or tell users to disable protections globally.
+
+## Publish an already verified Mac installer
+
+While Windows company verification is pending, dispatch `publish-mac.yml` on
+`main` with the successful protected `checks.yml` run ID. It requires source
+merged into main, both platform checks, the protected Mac signing job, and a
+matching signed/notarized/stapled report covering the exact PKG hash. It creates
+`v<package version>` at the tested source commit with only the Mac installer and
+checksums. It fails if that release already exists, preserving published assets.
+Windows preview downloads remain explicitly unsigned. The ordinary combined
+release workflow continues to require verified signatures for both platforms.
