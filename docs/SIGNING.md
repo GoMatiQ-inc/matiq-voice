@@ -12,6 +12,14 @@ require source that is already in `main`, and run after the regular platform CI
 jobs. Forks and ordinary pull-request builds receive no signing credentials.
 Private keys and passwords must never be committed or bundled with the app.
 Maintain encrypted certificate backups in the organization's secret manager.
+In CI, `CSC_LINK` and `CSC_INSTALLER_LINK` are base64-encoded P12 bundles.
+Local maintainers may instead pre-import both identities, unset those link
+variables, and select their keychain with `CSC_KEYCHAIN`.
+For exported P12 bundles, the release command creates a temporary keychain,
+imports both identities, sets signing-tool access using that keychain's own
+random password, and removes it and its temporary files in `finally`. It
+restores the original keychain search list and environment. This avoids the
+v26 automatic-import path that confuses P12 and keychain passwords.
 
 Mac environment secrets are `CSC_LINK`, `CSC_KEY_PASSWORD`, `CSC_NAME`,
 `CSC_INSTALLER_LINK`, `CSC_INSTALLER_KEY_PASSWORD`, `CSC_INSTALLER_NAME`,
