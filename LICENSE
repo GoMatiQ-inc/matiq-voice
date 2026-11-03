@@ -1,131 +1,59 @@
-# PolyForm Noncommercial License 1.0.0
+MatiQ Voice No-Sale License 1.0
 
-<https://polyformproject.org/licenses/noncommercial/1.0.0>
+Copyright 2026 MatiQ Inc (https://matiqinc.com).
 
-## Acceptance
+1. Scope and permission
 
-In order to get any license under these terms, you must agree
-to them as both strict obligations and conditions to all
-your licenses.
+"Software" means the MatiQ-authored code and documentation in MatiQ Voice,
+including modified versions and portions incorporated into other software.
+Third-party components remain subject to their own licenses.
 
-## Copyright License
+Subject to these terms, permission is granted, free of charge, to use, copy,
+modify, and distribute the Software in source or executable form. Personal,
+educational, nonprofit, and internal business use are expressly permitted,
+including use by employees and contractors within a for-profit company.
+You may use the Software to create work products, including transcripts and
+notes, for your business or clients, and charge for those work products or
+your own work. Output does not become Software merely because it was created
+using the Software.
 
-The licensor grants you a copyright license for the
-software to do everything you might do with the software
-that would otherwise infringe the licensor's copyright
-in it for any permitted purpose.  However, you may
-only distribute the software according to [Distribution
-License](#distribution-license) and make changes or new works
-based on the software according to [Changes and New Works
-License](#changes-and-new-works-license).
+2. No sale, paid access, hosting, or paid bundles
 
-## Distribution License
+You may not charge a fee or require other consideration for a copy of, a
+license to, access to, or use of the Software, including modified versions.
+You may not provide the Software to third parties as a paid hosted or managed
+service. You may not include the Software, or its functionality, in a product,
+service, subscription, or bundle for which a recipient must pay, even if the
+Software is described as a free component or has been modified or rebranded.
+These restrictions apply to source and executable distributions and to
+Software incorporated into another program. They do not prohibit internal
+business use or charging for work products as permitted in section 1.
+Charging specifically for access to the Software is prohibited even when
+that access also produces a transcript, note, or other output.
 
-The licensor grants you an additional copyright license
-to distribute copies of the software.  Your license
-to distribute covers distributing the software with
-changes and new works permitted by [Changes and New Works
-License](#changes-and-new-works-license).
+3. Notices and redistribution
 
-## Notices
+Every distributed copy or substantial portion of the Software must retain
+this entire license and the MatiQ attribution in NOTICE. Modified versions
+must identify that they have been modified and must not imply endorsement
+by MatiQ Inc. Recipients must receive the Software subject to these same
+terms; you may not grant rights inconsistent with this license. No rights
+to MatiQ names, logos, or trademarks are granted, except to reproduce the
+required attribution and identify the origin of the Software.
 
-You must ensure that anyone who gets a copy of any part of
-the software from you also gets a copy of these terms or the
-URL for them above, as well as copies of any plain-text lines
-beginning with `Required Notice:` that the licensor provided
-with the software.  For example:
+4. Separate permission
 
-> Required Notice: Copyright Yoyodyne, Inc. (http://example.com)
+Uses prohibited above require a separate written license from MatiQ Inc.
+This license does not restrict MatiQ Inc's ability to license code it owns
+under other terms. It does not alter licenses granted for earlier versions
+or override the separate licenses of third-party components.
 
-## Changes and New Works License
+5. Warranty and liability
 
-The licensor grants you an additional copyright license to
-make changes and new works based on the software for any
-permitted purpose.
-
-## Patent License
-
-The licensor grants you a patent license for the software that
-covers patent claims the licensor can license, or becomes able
-to license, that you would infringe by using the software.
-
-## Noncommercial Purposes
-
-Any noncommercial purpose is a permitted purpose.
-
-## Personal Uses
-
-Personal use for research, experiment, and testing for
-the benefit of public knowledge, personal study, private
-entertainment, hobby projects, amateur pursuits, or religious
-observance, without any anticipated commercial application,
-is use for a permitted purpose.
-
-## Noncommercial Organizations
-
-Use by any charitable organization, educational institution,
-public research organization, public safety or health
-organization, environmental protection organization,
-or government institution is use for a permitted purpose
-regardless of the source of funding or obligations resulting
-from the funding.
-
-## Fair Use
-
-You may have "fair use" rights for the software under the
-law. These terms do not limit them.
-
-## No Other Rights
-
-These terms do not allow you to sublicense or transfer any of
-your licenses to anyone else, or prevent the licensor from
-granting licenses to anyone else.  These terms do not imply
-any other licenses.
-
-## Patent Defense
-
-If you make any written claim that the software infringes or
-contributes to infringement of any patent, your patent license
-for the software granted under these terms ends immediately. If
-your company makes such a claim, your patent license ends
-immediately for work on behalf of your company.
-
-## Violations
-
-The first time you are notified in writing that you have
-violated any of these terms, or done anything with the software
-not covered by your licenses, your licenses can nonetheless
-continue if you come into full compliance with these terms,
-and take practical steps to correct past violations, within
-32 days of receiving notice.  Otherwise, all your licenses
-end immediately.
-
-## No Liability
-
-***As far as the law allows, the software comes as is, without
-any warranty or condition, and the licensor will not be liable
-to you for any damages arising out of these terms or the use
-or nature of the software, under any kind of legal claim.***
-
-## Definitions
-
-The **licensor** is the individual or entity offering these
-terms, and the **software** is the software the licensor makes
-available under these terms.
-
-**You** refers to the individual or entity agreeing to these
-terms.
-
-**Your company** is any legal entity, sole proprietorship,
-or other kind of organization that you work for, plus all
-organizations that have control over, are under the control of,
-or are under common control with that organization.  **Control**
-means ownership of substantially all the assets of an entity,
-or the power to direct its management and policies by vote,
-contract, or otherwise.  Control can be direct or indirect.
-
-**Your licenses** are all the licenses granted to you for the
-software under these terms.
-
-**Use** means anything you do with the software requiring one
-of your licenses.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.

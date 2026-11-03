@@ -159,12 +159,17 @@ the distributed product and GitHub repository are MatiQ Voice.
 
 ## License
 
-MatiQ-authored code is source available under [PolyForm Noncommercial 1.0.0](LICENSE).
-Noncommercial use, modification and redistribution are permitted under those
-terms. Preserve [the required MatiQ attribution notice](NOTICE) and the license
-when sharing copies or modifications. Commercial use, including use within a
-for-profit business, requires a separate license from MatiQ Inc. The license
-expressly permits certain nonprofit and public institutions; see its full terms.
-It is not an OSI open-source license because it restricts commercial use.
-Third-party components keep their own licenses; MatiQ branding does not imply
-endorsement of a fork. MatiQ Inc can separately license its own software commercially.
+MatiQ-authored code is source available under the [MatiQ Voice No-Sale License 1.0](LICENSE).
+Personal and internal business use, modification, and free redistribution are
+permitted, including use within a for-profit company. You may charge for your
+own work and work products created using the app. You may not charge for the
+software or access to it, offer it as paid hosting, or include it in a paid
+product, service, subscription, or bundle, including modified versions.
+Those uses require separate written permission from MatiQ Inc.
+
+Preserve [the MatiQ attribution notice](NOTICE) and the full license when
+sharing copies or modifications, and identify modified versions. This is a
+custom source-available license, not an OSI open-source license: open-source
+licenses permit commercial redistribution. The full LICENSE controls.
+Third-party components retain their own licenses; MatiQ branding does not
+imply endorsement of a fork. Earlier versions retain their original licenses.
