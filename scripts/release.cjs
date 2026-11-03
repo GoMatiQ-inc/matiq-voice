@@ -1,12 +1,15 @@
 const fs = require('node:fs');
 const path = require('node:path');
-const {spawnSync} = require('node:child_process');
-const {signingArgs} = require('./signing-config.cjs');
+const {signingConfig} = require('./signing-config.cjs');
 const directory = path.join(__dirname, '..');
-const configFile = path.join(directory, 'config/oauth.json');
-if (!fs.existsSync(configFile)) throw new Error('Configure both real OAuth registrations with npm run oauth:configure before a customer release.');
-const config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
-const args = signingArgs(process.platform, process.env, config);
-const result = spawnSync(process.execPath, [require.resolve('electron-builder/cli.js'), ...args], {cwd: directory, stdio: 'inherit'});
-if (result.error) throw result.error;
-process.exitCode = result.status ?? 1;
+async function main() {
+  const configFile = path.join(directory, 'config/oauth.json');
+  if (!fs.existsSync(configFile)) throw new Error('Configure both real OAuth registrations with npm run oauth:configure before a customer release.');
+  const oauth = JSON.parse(fs.readFileSync(configFile, 'utf8'));
+  const signing = signingConfig(process.platform, process.env, oauth);
+  const base = JSON.parse(fs.readFileSync(path.join(directory, 'package.json'), 'utf8')).build;
+  const config = {...base, ...signing};
+  for (const platform of ['mac', 'pkg', 'win']) if (signing[platform]) config[platform] = {...base[platform], ...signing[platform]};
+  await require('electron-builder').build({projectDir: directory, config, publish: 'never'});
+}
+main().catch(error => { console.error(error.message); process.exitCode = 1; });
