@@ -39,6 +39,10 @@ expected; managed work computers may prohibit installation. Production signing,
 live calendar/meeting qualification and wider hardware testing remain unfinished.
 See [validation and limitations](docs/VALIDATION.md).
 
+The signed-release pipeline is being qualified separately. The preview links
+below remain preview builds until verified signed downloads are published.
+See [installer signing and notarization](docs/SIGNING.md) for current requirements.
+
 | Computer | Download | Minimum OS |
 |---|---|---|
 | Apple Silicon Mac: M1, M2, M3, M4 or newer | [Mac installer (.pkg)](https://github.com/GoMatiQ-inc/matiq-voice/releases/download/v0.3.4-preview.1/MatiQ-Voice-0.3.4-preview.1-mac-arm64.pkg) | macOS 14.2 |
@@ -241,20 +245,18 @@ Windows packaging. Customer release commands fail without real registrations
 and signing configuration. Production Google verification and Apple notarization
 are external platform steps, not claims an automated fixture can prove.
 
-## Publishing preview installers
+## Publishing installers
 
-Maintain a version such as `0.3.4-preview.1` in both `package.json` and the lockfile,
-merge it through a reviewed PR, then push the matching `v0.3.4-preview.1` tag.
-The tag workflow builds and tests on both platforms, verifies the Mac PKG,
-and publishes a **prerelease** containing the tested Mac arm64 PKG, Windows x64
-EXE, release notes and SHA-256 checksums. Only merged `main` history is eligible;
-a mismatched tag, missing installer or failed job prevents publication.
+Merge a version update through a reviewed PR, then push the matching version
+tag. Preview tags (`vX.Y.Z-preview.N`) publish clearly labeled development
+installers after normal platform CI. Stable tags (`vX.Y.Z`) additionally require
+protected signed builds, native signature/notarization verification and reports
+that match the installer hashes. Only merged `main` history is eligible.
 
-Only the publication job receives `contents: write`, and it runs only for tags.
-Installer assets are separate from test logs/screenshots. The unsigned preview
-publisher rejects stable-version tags. A production release still requires the
-signing credentials and verification described above; do not relabel a preview
-as signed or notarized. Future versions should update the download table.
+See [SIGNING.md](docs/SIGNING.md) for credential isolation, preflight validation,
+Microsoft identity requirements and release checks. Stable publication fails
+when a signer, valid timestamp, Apple notarization or matching evidence is
+missing. Installer assets remain separate from test logs and screenshots.
 
 ## About MatiQ Inc
 

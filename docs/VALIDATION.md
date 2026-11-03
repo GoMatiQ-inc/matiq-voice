@@ -175,3 +175,17 @@ inferred from those fixture tests.
   and no Apple notarization. Trusted production signing is still an external
   gate. The preview publisher rejects stable versions; checksums do not certify
   an OS publisher identity. Intel Mac and native Windows ARM are not included.
+
+## Signed-release setup (2026-11-03)
+
+- 42 Node tests pass on the exact signing-workflow source under Linux. New tests
+  reject incomplete signing configuration, untrusted Azure endpoints, stale
+  installer verification reports and missing Apple notarization evidence.
+- The workflow adds protected tag-only signing, Developer ID app/native-helper
+  and Installer signatures, Apple notarization/stapling/Gatekeeper checks, and
+  Windows company Authenticode/timestamp verification. Windows uses OIDC rather
+  than a persistent Azure password. actionlint and staged secret scans pass.
+- These configuration/unit results do not prove a completed signed build.
+  Real Mac notarization and Windows Public Trust identity/profile qualification
+  must pass before signed downloads are claimed or published. Existing public
+  preview assets remain unsigned/ad-hoc. See SIGNING.md.
