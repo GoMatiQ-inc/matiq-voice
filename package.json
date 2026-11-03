@@ -1,7 +1,7 @@
 {
   "name": "matiq-voice",
   "productName": "MatiQ Voice",
-  "version": "0.3.3",
+  "version": "0.3.4-preview.1",
   "private": true,
   "description": "Private English dictation and meeting notes by MatiQ.",
   "author": "MatiQ Inc",
@@ -70,12 +70,14 @@
         "NSAudioCaptureUsageDescription": "MatiQ Voice captures meeting audio from this computer only when you start meeting recording.",
         "NSScreenCaptureUsageDescription": "Choose the meeting screen to capture its audio. MatiQ Voice does not save screen video."
       },
-      "icon": "build/icon.icns"
+      "icon": "build/icon.icns",
+      "artifactName": "MatiQ-Voice-${version}-mac-${arch}.${ext}"
     },
     "win": {
       "target": [
         "nsis"
-      ]
+      ],
+      "artifactName": "MatiQ-Voice-${version}-windows-${arch}.${ext}"
     },
     "nsis": {
       "oneClick": false,

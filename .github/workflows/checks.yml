@@ -57,3 +57,46 @@ jobs:
             .validation/e2e-results.json
             .validation/packaged-results.json
           if-no-files-found: error
+      - name: Retain tested preview installers
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-installers-${{ runner.os }}-${{ runner.arch }}
+          retention-days: 7
+          path: |
+            dist/*.pkg
+            dist/*.exe
+          if-no-files-found: error
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: desktop
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Require source merged into main
+        run: git merge-base --is-ancestor HEAD origin/main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-installers-*
+          merge-multiple: true
+          path: release-assets
+      - name: Validate downloads and generate checksums and notes
+        run: node scripts/prepare-release.mjs release-assets
+      - name: Publish preview downloads
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: >-
+          gh release create "$RELEASE_TAG"
+          release-assets/*.pkg release-assets/*.exe release-assets/SHA256SUMS.txt
+          --verify-tag --prerelease
+          --title "MatiQ Voice $RELEASE_TAG (Preview)"
+          --notes-file release-assets/RELEASE_NOTES.md
