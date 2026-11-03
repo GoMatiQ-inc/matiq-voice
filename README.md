@@ -1,25 +1,125 @@
-# MatiQ Voice
+# MatiQ Voice — Free Local Dictation for Mac and Windows
 
-Local English dictation and meeting notes for macOS and Windows, by MatiQ Inc.
+**MatiQ Voice** is a free English speech-to-text and meeting-notes app by
+[MatiQ Inc](https://matiqinc.com). Dictate into the text field you are using,
+choose your own toggle or push-to-talk shortcut, and run speech recognition
+locally on your computer. No transcription subscription or cloud speech service
+is required. Personal and internal company use are free.
 
-**Development release:** working application and automated E2E coverage. Real
-OAuth registrations, signed customer distribution, and live meeting/native OS
-qualification are separate release gates in [VALIDATION.md](docs/VALIDATION.md).
+**[Download Mac and Windows installers](https://github.com/GoMatiQ-inc/matiq-voice/releases)** ·
+[Report a problem](https://github.com/GoMatiQ-inc/matiq-voice/issues) ·
+[License](LICENSE)
 
-## Use
+## Why MatiQ Inc built MatiQ Voice
 
-On Mac, open the `.pkg` installer for your architecture; it installs to
-`/Applications` and preserves your existing profile. Quit the running app before
-upgrading. DMG/ZIP builds remain available for development; drag the DMG app
-into its Applications shortcut rather than running it from the disk image.
-On Windows, run the NSIS `.exe` installer; it creates a Start menu shortcut and
-keeps user data when uninstalling. Then follow first-run setup:
+We wanted a dependable way to speak instead of type. Repeated crashes, broken
+shortcuts, and time spent repairing dictation tools got in the way. We also
+wanted our spoken words preserved, without a second AI pass cleaning up fillers,
+rewriting sentences, or changing what we meant. So we built a local tool we can
+inspect, fix, and improve ourselves, and are sharing it with others who need it.
 
-1. Check this computer's CPU, memory, disk and bundled engine.
-2. Download/verify the recommended English speech and speaker-label models.
-3. Test microphone input and choose automatic paste or Copy.
-4. Optionally connect Microsoft or Google through the system browser.
-5. Finish setup. No terminal, Python, Node or package installation is needed.
+We want this tool to be free because useful everyday software should give
+people their time back. You should be able to dictate a message or use the app
+at work without another subscription or a usage-based transcription bill.
+Keeping recognition local also gives you control over your recordings and
+transcripts. Recognition can still mishear or omit words; disabling rewriting
+does not make an accuracy guarantee.
+
+You can use MatiQ Voice inside a company, study its source, modify it, and share
+it free with attribution. The [No-Sale License](LICENSE) prevents charging for
+the software, paid access or hosting, and inclusion in paid bundles without
+separate permission. This is **source available**, not OSI open source.
+
+## Download and install
+
+The current download is **v0.3.4-preview.1**. It is an early public preview:
+macOS builds are ad-hoc signed and not Apple-notarized, the Mac installer is
+unsigned, and Windows builds are unsigned. Operating-system warnings are
+expected; managed work computers may prohibit installation. Production signing,
+live calendar/meeting qualification and wider hardware testing remain unfinished.
+See [validation and limitations](docs/VALIDATION.md).
+
+| Computer | Download | Minimum OS |
+|---|---|---|
+| Apple Silicon Mac: M1, M2, M3, M4 or newer | [Mac installer (.pkg)](https://github.com/GoMatiQ-inc/matiq-voice/releases/download/v0.3.4-preview.1/MatiQ-Voice-0.3.4-preview.1-mac-arm64.pkg) | macOS 14.2 |
+| Windows PC: Intel/AMD 64-bit | [Windows installer (.exe)](https://github.com/GoMatiQ-inc/matiq-voice/releases/download/v0.3.4-preview.1/MatiQ-Voice-0.3.4-preview.1-windows-x64.exe) | Windows 10 |
+
+Intel Mac and native Windows ARM installers are not included in this preview.
+On Mac, **Apple menu → About This Mac** shows whether you have an Apple chip or
+Intel processor. On Windows, **Settings → System → About → System type** shows
+your architecture. On the [Releases page](https://github.com/GoMatiQ-inc/matiq-voice/releases),
+expand **Assets** and choose the installer for your computer. **Source code
+(zip)** and **Source code (tar.gz)** are for developers, not installers.
+
+You do **not** need Node, Python, a compiler, an Apple developer account, or your
+own OAuth registration to run a downloaded app. Setup downloads the local speech
+models over the internet; allow several GB of free space and keep the computer
+connected until verification finishes. After model installation, local dictation
+works offline. Optional calendar connections require internet access.
+
+### Mac installation
+
+1. Quit an existing MatiQ Voice from its menu-bar icon before upgrading.
+2. Download the `.pkg` above and open it. Complete the installer, including
+   administrator approval. It installs **MatiQ Voice.app in `/Applications`**.
+3. Open **Finder → Applications → MatiQ Voice**. Grant Microphone permission
+   when asked. For pasting and background shortcuts, enable that installed app
+   in **System Settings → Privacy & Security → Accessibility** and, if requested,
+   **Input Monitoring**. Use **Settings → Show app in Finder** to locate it.
+4. Return to the app, check access again, and complete setup. If macOS requests
+   a restart of the app, quit it from the menu bar and reopen it.
+
+Because this preview is not notarized, macOS may block the installer or app.
+If you choose to run it after verifying this repository and download, follow
+[Apple's app-specific guidance](https://support.apple.com/en-us/102445): after
+the blocked attempt, look in **System Settings → Privacy & Security** for
+**Open Anyway** and review the named app before confirming. Do not disable
+Gatekeeper globally. If your organization blocks installation, ask its IT team.
+
+An old enabled permission entry can refer to a previous ad-hoc build. Remove
+only the MatiQ Voice entry, add the current `/Applications/MatiQ Voice.app`,
+then quit/reopen the app and use **Check keyboard access** or **Check again**.
+Do not remove your models, settings, or recordings to repair permissions.
+
+### Windows installation
+
+1. Quit an existing MatiQ Voice from its system-tray icon before upgrading.
+2. Download and run the `.exe` above. Choose the installation folder and finish
+   the setup wizard. Launch **MatiQ Voice** from the Start menu.
+3. Allow microphone access when asked, complete model setup, and select your
+   preferred bindings. Use **Settings → Check keyboard access** if a shortcut
+   is not responding.
+
+This preview is unsigned, so Windows may show an unknown-publisher or SmartScreen
+warning. Verify the download and its source before deciding whether to proceed;
+use the app-specific options Windows offers. Do not turn off SmartScreen or
+antivirus globally. Company security policy may require IT approval. Physical
+Windows shortcut delivery, protected text fields and clean-machine upgrades
+still require wider testing even though Windows CI passes.
+
+### First run and everyday dictation
+
+1. Review the hardware check and install the recommended English speech model.
+2. Wait for the download and SHA-256 verification to finish.
+3. Test your microphone and configure paste/keyboard access, or choose Copy.
+4. Optionally connect Microsoft or Google calendars. Calendar consent and
+   provider verification are still in qualification; local dictation does not
+   require a connection. See [OAuth status](docs/VALIDATION.md#oauth-registration-follow-up).
+5. Finish setup. Select a text field in another app, press your shortcut, wait
+   for **Listening**, speak, then stop to transcribe and insert your words.
+
+Closing the main window keeps MatiQ Voice in the Mac menu bar or Windows system
+tray. **Quit** from that icon to stop it. Upgrades preserve the local profile;
+quitting first prevents an installer from interrupting a recording.
+
+### Verify a download (optional)
+
+Each release includes `SHA256SUMS.txt`. Compare its entry with the hash of your
+download. On Mac, run `shasum -a 256` followed by the downloaded file path. On
+Windows PowerShell, use `Get-FileHash -Algorithm SHA256` followed by that path.
+Checksums identify the published file; they do not replace publisher signing.
+
+## Dictation, shortcuts, and local meeting notes
 
 In **Settings → Dictation bindings**, click **Record binding** beside Toggle or
 Push to talk, hold your desired key or combination, release all keys, then Save.
@@ -96,13 +196,13 @@ verifies that packaging retains this file; automatic PNG-to-ICNS conversion
 previously corrupted the smallest Finder icon.
 
 `npm run package` uses ad-hoc signing on Mac and needs no paid Apple account.
-MatiQ official downloads must use Developer ID signing and Apple notarization
+Production releases require Developer ID signing and Apple notarization
 through `npm run package:release`. Mac release builds require both
 `CSC_NAME` (Developer ID Application) and `CSC_INSTALLER_NAME` (Developer ID
 Installer), plus the documented Apple notarization environment variables. Local builds and forks never receive MatiQ
 signing keys. A fork distributed with Developer ID trust needs its own signing
-identity and notarization credentials. The current installed development build
-is ad-hoc signed, not a notarized public release.
+identity and notarization credentials. Preview downloads are ad-hoc signed and explicitly labeled as not notarized.
+The production signing gate remains separate from preview publication.
 
 ## OAuth owned by MatiQ
 
@@ -133,13 +233,36 @@ isolated app/browser profiles, and removes temporary profiles afterward.
 Models/native inference and OS-protected credential files are real; provider
 consent pages and capture devices are local fixtures. Tests never join a real
 meeting or record the user's screen/system audio. Copy tests use the system
-clipboard. CI is configured to build and run these checks separately on Mac and Windows;
-current account-level execution blockers are recorded in VALIDATION.md.
+clipboard. CI builds and runs these checks separately on Mac and Windows. Both platforms
+passed on the initial public source release; see VALIDATION.md for actual scope.
 
 The default package is a development build: ad-hoc Mac signing / unsigned
 Windows packaging. Customer release commands fail without real registrations
 and signing configuration. Production Google verification and Apple notarization
 are external platform steps, not claims an automated fixture can prove.
+
+## Publishing preview installers
+
+Maintain a version such as `0.3.4-preview.1` in both `package.json` and the lockfile,
+merge it through a reviewed PR, then push the matching `v0.3.4-preview.1` tag.
+The tag workflow builds and tests on both platforms, verifies the Mac PKG,
+and publishes a **prerelease** containing the tested Mac arm64 PKG, Windows x64
+EXE, release notes and SHA-256 checksums. Only merged `main` history is eligible;
+a mismatched tag, missing installer or failed job prevents publication.
+
+Only the publication job receives `contents: write`, and it runs only for tags.
+Installer assets are separate from test logs/screenshots. The unsigned preview
+publisher rejects stable-version tags. A production release still requires the
+signing credentials and verification described above; do not relabel a preview
+as signed or notarized. Future versions should update the download table.
+
+## About MatiQ Inc
+
+[MatiQ Inc — Applied AI & Engineering](https://matiqinc.com) helps organizations
+with digital transformation, enterprise AI training, and software development
+and AI engineering. We built MatiQ Voice around a practical need: software that
+helps people get work done while keeping their words and recordings under their
+control. You do not need to be a MatiQ client or subscribe to a platform to use it.
 
 ## Source map
 

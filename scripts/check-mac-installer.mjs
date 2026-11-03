@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 if (process.platform !== 'darwin') throw new Error('Run installer verification on macOS, where pkgutil is available.');
 const root=path.resolve(import.meta.dirname,'..');
-const pkg=process.argv[2] || path.join(root,'dist',`MatiQ Voice-${JSON.parse(await fs.readFile(path.join(root,'package.json'),'utf8')).version}-${process.arch}.pkg`);
+const pkg=process.argv[2] || path.join(root,'dist',`MatiQ-Voice-${JSON.parse(await fs.readFile(path.join(root,'package.json'),'utf8')).version}-mac-${process.arch}.pkg`);
 const temporary=await fs.mkdtemp(path.join(os.tmpdir(),'matiq-installer-check-'));
 function run(args) {
   const result=spawnSync('/usr/sbin/pkgutil',args,{encoding:'utf8',maxBuffer:8*1024*1024});

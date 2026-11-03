@@ -155,3 +155,23 @@ inferred from those fixture tests.
   development builds; no trusted public-distribution claim is made.
 - Windows NSIS preserves profile data and creates a Start menu shortcut. Actual
   Windows install/upgrade and native permission qualification remain outstanding.
+
+## Public CI and preview distribution (2026-11-03)
+
+- Public-repository CI run 41670776701 passed both macOS arm64 and Windows x64
+  on merged source c099882: unit tests, native engine compilation, desktop E2E,
+  packaging and packaged native speech/speaker inference. Mac installer checks
+  passed. The historical private Actions budget refusal above no longer blocks
+  these public jobs. Physical Windows keyboard delivery and live capture still
+  need qualification; fixture CI is not a clean-machine installation test.
+- The preview publication helper passes six new safety tests: exact hashes and
+  visible signing limits, mismatched tags, stable-version rejection, missing
+  installers, unexpected debug files and empty installer rejection. All 36 Node
+  tests pass on the exact release-workflow source under Linux.
+- Preview tags must match package metadata and belong to merged main history.
+  Publication depends on both native CI jobs and uploads only Mac arm64 PKG,
+  Windows x64 EXE and their checksums. The first version is 0.3.4-preview.1.
+- Preview downloads remain unsigned Windows / ad-hoc Mac, with an unsigned PKG
+  and no Apple notarization. Trusted production signing is still an external
+  gate. The preview publisher rejects stable versions; checksums do not certify
+  an OS publisher identity. Intel Mac and native Windows ARM are not included.
