@@ -66,6 +66,7 @@ jobs:
             dist/*.dmg
             dist/*.zip
             dist/*.exe
+            .validation/hud-*.png
             .validation/matiq-voice-e2e.png
             .validation/e2e-failure.png
             .validation/e2e-results.json

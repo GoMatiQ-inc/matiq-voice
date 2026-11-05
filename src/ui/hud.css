@@ -1,1 +1,13 @@
-@font-face{font-family:SourceSans;src:url('assets/source-sans.woff2')}*{box-sizing:border-box}body{margin:8px;font:13px SourceSans,Arial,sans-serif;color:#1b1d21}.pill{display:flex;align-items:center;gap:12px;background:#fff;border:1px solid #d8dadd;border-radius:16px;padding:12px 16px;box-shadow:0 4px 12px #1b1d2120}.dot{width:8px;height:8px;border-radius:50%;background:#14458f}.info{flex:1;min-width:0}strong{font-size:13px}progress{display:block;width:100%;height:4px;accent-color:#14458f;margin-top:4px}button{border:0;background:#f5f6f8;color:#1b1d21;border-radius:6px;padding:5px 9px;cursor:pointer}button:focus-visible{outline:2px solid #14458f}#time{font-variant-numeric:tabular-nums;color:#4a4f57}
+@font-face{font-family:SourceSans;src:url('assets/source-sans.woff2')}
+*{box-sizing:border-box}body{margin:8px;background:transparent;font:14px SourceSans,Arial,sans-serif;color:#fff;user-select:none}
+.indicator{height:44px;display:flex;align-items:center;gap:12px;padding:0 14px 0 9px;border-radius:24px;background:#b42338;border:1px solid #ffffff24;box-shadow:0 3px 10px #45111c30}
+#stop{display:grid;place-items:center;width:28px;height:28px;flex-shrink:0;padding:0;border:1px solid #ffffff80;border-radius:50%;background:transparent;color:inherit;cursor:pointer}
+#stop:hover{background:#ffffff24}#stop:focus-visible{outline:2px solid #fff;outline-offset:3px}#stop:disabled{cursor:default}
+.record-symbol{width:9px;height:9px;background:currentColor;border-radius:50%}
+#waveform{flex:1;height:30px;display:flex;gap:3px;align-items:center;justify-content:center}
+#waveform span{display:block;flex:0 0 3px;height:3px;border-radius:3px;background:currentColor;transition:height 90ms linear}
+#time{min-width:35px;text-align:right;font-variant-numeric:tabular-nums;letter-spacing:.02em}
+.indicator[data-state*="preparing"] .record-symbol,.indicator[data-state*="processing"] .record-symbol{width:13px;height:13px;background:transparent;border:2px solid #ffffff50;border-top-color:#fff;animation:working 900ms linear infinite}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
+@keyframes working{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){#waveform span{transition:none}.record-symbol{animation:none!important}}

@@ -217,3 +217,12 @@ inferred from those fixture tests.
   still awaiting Microsoft organization validation; its public preview stays
   unsigned. Privacy/admin permission prompts and live provider limitations
   remain applicable.
+
+## Recording indicator and window lifecycle changes
+
+- 46 Node tests and workflow lint pass for the compact red recording indicator.
+- New native E2E scenarios check silence-to-speech-to-silence amplitude changes,
+  elapsed time, top-center placement, non-focusability, hide on cancellation, and
+  main-window close/reopen with Mac Dock visibility. CI retains indicator images.
+  Native CI results must pass before the new installer is published.
+- Windows organization verification remains a separate Microsoft approval gate.

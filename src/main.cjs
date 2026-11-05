@@ -1,4 +1,4 @@
-const {app, BrowserWindow, Menu, Tray, nativeImage, globalShortcut, ipcMain, clipboard, session, systemPreferences, shell, dialog, safeStorage, desktopCapturer, utilityProcess, powerSaveBlocker, powerMonitor} = require('electron');
+const {app, BrowserWindow, Menu, Tray, nativeImage, globalShortcut, ipcMain, clipboard, session, systemPreferences, shell, dialog, safeStorage, desktopCapturer, utilityProcess, powerSaveBlocker, powerMonitor, screen} = require('electron');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const {pathToFileURL} = require('node:url');
@@ -45,9 +45,9 @@ async function start(options) {
   let operation = null, quitting = false, shortcutReady = false, generation = 0, activeMeeting = null, worker = null, awake = null;
   const win = new BrowserWindow({width: 1120, height: 820, minWidth: 840, minHeight: 640, title: 'MatiQ Voice', backgroundColor: '#ffffff', show: false,
     webPreferences: {preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false}});
-  const hud = new BrowserWindow({width: 340, height: 76, frame: false, transparent: true, resizable: false, focusable: false, alwaysOnTop: true, skipTaskbar: true, show: false,
-    webPreferences: {preload: path.join(__dirname, 'hud-preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true}});
-  win.setMenuBarVisibility(false); hud.setVisibleOnAllWorkspaces(true, {visibleOnFullScreen: true});
+  const hud = new BrowserWindow({width: 248, height: 60, frame: false, transparent: true, hasShadow: false, resizable: false, focusable: false, alwaysOnTop: true, skipTaskbar: true, show: false,
+    webPreferences: {preload: path.join(__dirname, 'hud-preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false}});
+  win.setMenuBarVisibility(false); hud.setVisibleOnAllWorkspaces(true, {visibleOnFullScreen: true, skipTransformProcessType: true});
   const send = message => { if (!win.isDestroyed()) win.webContents.send('app-event', message); };
   const notice = message => send({type: 'notice', message});
   const nativeDir = app.isPackaged ? path.join(process.resourcesPath, 'native') : path.join(__dirname, '..', 'native');
@@ -73,11 +73,26 @@ async function start(options) {
       {type: 'separator'}, {label: 'Quit MatiQ Voice', click: () => app.quit()}
     ]));
   }
+  function positionHud() {
+    const {workArea} = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+    const [width, height] = hud.getSize();
+    hud.setBounds({x: Math.round(workArea.x + (workArea.width - width) / 2), y: workArea.y + 10, width, height});
+  }
+  screen.on('display-metrics-changed', () => { if (hud.isVisible()) positionHud(); });
+  screen.on('display-removed', () => { if (hud.isVisible()) positionHud(); });
+  win.on('show', () => {
+    win.setSkipTaskbar(false);
+    if (process.platform === 'darwin') app.dock.show().catch(error => notice(`Could not show the Dock icon: ${error.message}`));
+  });
+  win.on('hide', () => {
+    win.setSkipTaskbar(true);
+    if (process.platform === 'darwin') app.dock.hide();
+  });
   function setState(next) {
     state = next; updateTray(); send({type: 'state', state});
     if (!hud.isDestroyed()) {
       hud.webContents.send('hud-state', {state});
-      if (['preparing', 'recording', 'processing', 'meeting-preparing', 'meeting-recording', 'meeting-processing'].includes(state)) hud.showInactive(); else hud.hide();
+      if (['preparing', 'recording', 'processing', 'meeting-preparing', 'meeting-recording', 'meeting-processing'].includes(state)) { if (!hud.isVisible()) positionHud(); hud.showInactive(); } else hud.hide();
     }
   }
   if (process.platform === 'darwin') Menu.setApplicationMenu(Menu.buildFromTemplate([

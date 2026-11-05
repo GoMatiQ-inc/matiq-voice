@@ -19,7 +19,16 @@ failed downloads do not become installed models. Leave disk headroom.
 Setup includes an actual audio-signal test, contextual paste permissions,
 optional Microsoft/Google OAuth connections and explicit completion. Models
 can be verified/repaired later. Launch-at-login is available in the installed
-app. Closing hides the app; menu bar/system tray controls remain alive.
+app. Closing hides the app; menu bar/system tray controls remain alive. The main
+window appears in the Mac Dock or Windows taskbar while open; closing removes
+it from that location. Reopening from the menu bar or tray restores it.
+
+During recording, a compact red indicator floats at the top center of the
+active display, below its menu bar/notch. A recording symbol doubles as the stop
+control, alongside elapsed time and live audio-level bars. Silence is a row of
+dots; speech grows those dots into a waveform. It never takes typing focus.
+Preparing/transcribing uses a progress symbol and freezes the recording timer;
+the indicator disappears when the operation finishes.
 
 ## Dictation
 
