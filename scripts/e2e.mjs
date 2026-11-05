@@ -125,6 +125,36 @@ try {
     for (const provider of ['microsoft', 'google']) { const encrypted = await fs.readFile(path.join(profile, 'credentials', `${provider}.bin`)); assert.equal(encrypted.includes(Buffer.from('fixture-access-')), false); }
     await page.locator('#setup-next').click(); await page.locator('#setup-next').click(); await expect(page.locator('#setup-dialog')).not.toBeVisible();
   });
+  await scenario('floating indicator follows live levels, stays top-centered and never takes focus', async () => {
+    const hud = desktop.windows().find(window => window.url().endsWith('/hud.html'));
+    hud.on('pageerror', error => pageErrors.push(error.message));
+    await expect(hud.locator('#waveform span')).toHaveCount(19);
+    await page.evaluate(async () => { await window.matiqVoice.begin(); await window.matiqVoice.recordingReady(); await window.matiqVoice.meter({level: 0, seconds: 2}); });
+    await expect(hud.locator('#time')).toHaveText('0:02');
+    await expect.poll(() => hud.locator('#waveform span').evaluateAll(bars => bars.every(bar => Math.abs(bar.getBoundingClientRect().height - 3) < .1))).toBe(true);
+    await hud.screenshot({path: path.join(fixtures, 'hud-silent.png')});
+    await page.evaluate(() => window.matiqVoice.meter({level: .7, seconds: 3}));
+    await expect.poll(() => hud.locator('#waveform span').nth(9).evaluate(bar => bar.getBoundingClientRect().height)).toBeGreaterThan(20);
+    await expect(hud.locator('#time')).toHaveText('0:03');
+    assert.deepEqual(await desktop.evaluate(({BrowserWindow, screen}) => {
+      const hud = BrowserWindow.getAllWindows().find(window => window.webContents.getURL().endsWith('/hud.html'));
+      const bounds = hud.getBounds(), area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
+      return {centered: Math.abs(bounds.x + bounds.width / 2 - area.x - area.width / 2) <= 1, top: bounds.y === area.y + 10, focused: hud.isFocused(), focusable: hud.isFocusable()};
+    }), {centered: true, top: true, focused: false, focusable: false});
+    await hud.screenshot({path: path.join(fixtures, 'hud-recording.png')});
+    await page.evaluate(() => window.matiqVoice.meter({level: 0, seconds: 4}));
+    await expect.poll(() => hud.locator('#waveform span').evaluateAll(bars => bars.every(bar => Math.abs(bar.getBoundingClientRect().height - 3) < .1))).toBe(true);
+    await page.evaluate(() => window.matiqVoice.cancel());
+    assert.equal(await desktop.evaluate(({BrowserWindow}) => BrowserWindow.getAllWindows().find(window => window.webContents.getURL().endsWith('/hud.html')).isVisible()), false);
+  });
+  await scenario('close runs in the tray and reopening restores the Mac Dock icon', async () => {
+    await desktop.evaluate(({BrowserWindow}) => BrowserWindow.getAllWindows().find(window => window.getTitle() === 'MatiQ Voice').close());
+    assert.equal(await desktop.evaluate(({BrowserWindow}) => BrowserWindow.getAllWindows().find(window => window.getTitle() === 'MatiQ Voice').isVisible()), false);
+    if (process.platform === 'darwin') assert.equal(await desktop.evaluate(({app}) => app.dock.isVisible()), false);
+    await desktop.evaluate(({app}) => app.emit('activate'));
+    await expect.poll(() => desktop.evaluate(({BrowserWindow}) => BrowserWindow.getAllWindows().find(window => window.getTitle() === 'MatiQ Voice').isVisible())).toBe(true);
+    if (process.platform === 'darwin') await expect.poll(() => desktop.evaluate(({app}) => app.dock.isVisible())).toBe(true);
+  });
   async function keys(events) {
     const map=require('../src/key-bindings.cjs').keyMap(process.platform);
     await desktop.evaluate((_,events)=>{
