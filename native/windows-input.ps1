@@ -63,10 +63,13 @@ if ($Action -eq 'session') {
     $insertion = $ranges[0].Clone()
     $insertion.MoveEndpointByRange($end, $insertion, $start)
     $insertion.Select()
-    $verified = $textPattern.GetSelection()
-    if ($verified.Length -ne 1 -or $verified[0].CompareEndpoints($start, $originalRange, $start) -ne 0 -or $verified[0].CompareEndpoints($start, $verified[0], $end) -ne 0) {
-      throw 'The selected text cannot be preserved safely. Use Copy.'
+    $preserved = $false
+    for ($attempt = 0; $attempt -lt 20 -and -not $preserved; $attempt++) {
+      Start-Sleep -Milliseconds 10
+      $verified = $textPattern.GetSelection()
+      $preserved = $verified.Length -eq 1 -and $verified[0].CompareEndpoints($start, $originalRange, $start) -eq 0 -and $verified[0].CompareEndpoints($start, $verified[0], $end) -eq 0
     }
+    if (-not $preserved) { throw 'The selected text cannot be preserved safely. Use Copy.' }
   }
 
   [VerbatimInput]::Paste()
