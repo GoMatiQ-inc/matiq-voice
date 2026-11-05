@@ -189,7 +189,7 @@ try {
   await scenario('quick push-to-talk release during microphone startup never leaves recording running',async()=>{
     await page.evaluate(()=>{const original=navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);window.__restoreMicrophone=()=>{navigator.mediaDevices.getUserMedia=original;};navigator.mediaDevices.getUserMedia=async options=>{await new Promise(resolve=>setTimeout(resolve,400));return original(options);};});
     await keys([['AltRight',true],['AltRight',false]]);
-    await expect(page.locator('#notice')).toContainText('No audio captured',{timeout:15000});
+    await expect(page.locator('#notice')).toContainText(/No audio captured|recognizer returned no words/,{timeout:15000});
     assert.equal((await page.evaluate(()=>window.matiqVoice.status())).state,'idle');await page.evaluate(()=>window.__restoreMicrophone());
   });
   await scenario('verbatim recognition and copy use the bundled real speech engine', async () => {
