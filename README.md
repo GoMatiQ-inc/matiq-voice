@@ -32,7 +32,7 @@ separate permission. This is **source available**, not OSI open source.
 
 ## Download and install
 
-The Mac download is **v0.3.5**, signed with MatiQ's Developer ID and
+The Mac download is **v0.3.6**, signed with MatiQ's Developer ID and
 Apple-notarized. Its app, native engines and installer passed signature,
 stapling and Gatekeeper checks. Windows remains the **unsigned
 v0.3.4-preview.1 preview** while Microsoft reviews company signing verification;
@@ -43,7 +43,7 @@ and wider hardware testing remain unfinished. See
 
 | Computer | Download | Minimum OS |
 |---|---|---|
-| Apple Silicon Mac: M1, M2, M3, M4 or newer | [Mac installer (.pkg)](https://github.com/GoMatiQ-inc/matiq-voice/releases/download/v0.3.5/MatiQ-Voice-0.3.5-mac-arm64.pkg) | macOS 14.2 |
+| Apple Silicon Mac: M1, M2, M3, M4 or newer | [Mac installer (.pkg)](https://github.com/GoMatiQ-inc/matiq-voice/releases/download/v0.3.6/MatiQ-Voice-0.3.6-mac-arm64.pkg) | macOS 14.2 |
 | Windows PC: Intel/AMD 64-bit | [Windows installer (.exe)](https://github.com/GoMatiQ-inc/matiq-voice/releases/download/v0.3.4-preview.1/MatiQ-Voice-0.3.4-preview.1-windows-x64.exe) | Windows 10 |
 
 Intel Mac and native Windows ARM installers are not included in this preview.
@@ -137,8 +137,10 @@ system-reserved or hardware/media keys are not exposed by the OS. Ordinary keybo
 
 The HUD leaves the original field focused. Closing the main window hides it;
 use the menu-bar/system-tray menu to open it or Quit. The original field is
-checked before insertion; unsupported/changed destinations leave a recoverable
-transcript to copy. There is no word-removal or rewriting stage. Recognition
+checked before insertion. Native paste inserts at its original caret without
+rewriting the existing field. Highlighted text is kept, with new words inserted
+at the selection's start. Moving the caret or changing fields leaves a
+recoverable transcript to copy. There is no word-removal or rewriting stage. Recognition
 itself can err.
 
 For meetings, select an upcoming calendar event or choose Record meeting.

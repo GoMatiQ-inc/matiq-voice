@@ -247,5 +247,13 @@ inferred from those fixture tests.
   completion, release or repeat; modifier events continue to the OS.
 - The native test ran with a 120-second watchdog and tracked its owned processes
   and actual inspector listeners. Independent teardown checks found no owned
-  processes or listeners remaining. Windows native caret checks are now part
-  of CI; their result and signed installer qualification remain pending.
+  processes or listeners remaining.
+- [Native CI 42081604347](https://github.com/GoMatiQ-inc/matiq-voice/actions/runs/42081604347)
+  passed both desktop E2E/package jobs, packaged speech inference and the new
+  Windows native caret checks, including changed-caret/field rejection.
+  Windows selection collapse and caret updates wait briefly for asynchronous
+  UI Automation notifications.
+- [Protected Mac preflight 42082685069](https://github.com/GoMatiQ-inc/matiq-voice/actions/runs/42082685069)
+  passed the merged 0.3.6 source, both desktop package jobs, Developer ID
+  app/native-helper and Installer signatures, app and PKG notarization,
+  stapling, Gatekeeper and packaged speech inference.
