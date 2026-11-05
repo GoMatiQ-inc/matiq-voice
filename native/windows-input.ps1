@@ -46,6 +46,8 @@ if ($Action -eq 'session') {
   Write-Output 'ready'
   $command = [Console]::ReadLine()
   if ($command -ne 'paste') { exit 0 }
+  # Let the editor's pending UI Automation caret/focus notifications settle.
+  Start-Sleep -Milliseconds 150
   $current = [System.Windows.Automation.AutomationElement]::FocusedElement
   if ($null -eq $current -or ($current.GetRuntimeId() -join ':') -ne $originalId -or [VerbatimInput]::GetForegroundWindow().ToInt64() -ne $window) {
     throw 'The selected text field changed. Copy the transcript into the intended field.'
