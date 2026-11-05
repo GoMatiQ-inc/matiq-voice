@@ -68,24 +68,21 @@ int main(int argc, const char *argv[]) {
                 }
                 if (!same) { fprintf(stderr, "The selected text field or caret changed. Copy the transcript into the intended field.\n"); result = 78; }
                 else {
-                    CFTypeRef existing = NULL;
-                    Boolean settable = false;
-                    AXUIElementIsAttributeSettable((AXUIElementRef)original, kAXValueAttribute, &settable);
-                    if (hasRange && settable && AXUIElementCopyAttributeValue((AXUIElementRef)original, kAXValueAttribute, &existing) == kAXErrorSuccess && existing && CFGetTypeID(existing) == CFStringGetTypeID()) {
-                        NSString *value = (__bridge NSString *)existing;
-                        if (originalRange.location >= 0 && originalRange.length >= 0 && originalRange.location + originalRange.length <= value.length) {
-                            NSString *replacement = [value stringByReplacingCharactersInRange:NSMakeRange(originalRange.location, originalRange.length) withString:insertion];
-                            AXError written = AXUIElementSetAttributeValue((AXUIElementRef)original, kAXValueAttribute, (__bridge CFStringRef)replacement);
-                            CFRelease(existing); existing = NULL;
-                            if (written == kAXErrorSuccess) {
-                                CFRange caret = CFRangeMake(originalRange.location + insertion.length, 0);
-                                AXValueRef selected = AXValueCreate(kAXValueCFRangeType, &caret);
-                                AXUIElementSetAttributeValue((AXUIElementRef)original, kAXSelectedTextRangeAttribute, selected);
-                                CFRelease(selected); CFRelease(original); CFRelease(system); return 0;
-                            }
-                        }
+                    if (!hasRange) { CFRelease(original); CFRelease(system); fprintf(stderr, "This field does not expose a reliable text cursor. Use Copy.\n"); return 78; }
+                    if (![[NSPasteboard.generalPasteboard stringForType:NSPasteboardTypeString] isEqualToString:insertion]) {
+                        CFRelease(original); CFRelease(system); fprintf(stderr, "The clipboard changed before insertion. Copy the transcript again.\n"); return 78;
                     }
-                    if (existing) CFRelease(existing);
+                    // Insert without deleting highlighted text. Never rewrite the field's value.
+                    if (originalRange.length > 0) {
+                        CFRange caret = CFRangeMake(originalRange.location, 0);
+                        AXValueRef selected = AXValueCreate(kAXValueCFRangeType, &caret);
+                        AXError collapsed = AXUIElementSetAttributeValue((AXUIElementRef)original, kAXSelectedTextRangeAttribute, selected);
+                        CFRelease(selected);
+                        CFTypeRef verified = NULL; CFRange range;
+                        bool preserved = collapsed == kAXErrorSuccess && AXUIElementCopyAttributeValue((AXUIElementRef)original, kAXSelectedTextRangeAttribute, &verified) == kAXErrorSuccess && verified && AXValueGetValue((AXValueRef)verified, kAXValueCFRangeType, &range) && range.location == originalRange.location && range.length == 0;
+                        if (verified) CFRelease(verified);
+                        if (!preserved) { CFRelease(original); CFRelease(system); fprintf(stderr, "The selected text cannot be preserved safely. Use Copy.\n"); return 78; }
+                    }
                     CGEventRef down = CGEventCreateKeyboardEvent(NULL, 9, true), up = CGEventCreateKeyboardEvent(NULL, 9, false);
                     if (!down || !up) result = 79;
                     else { CGEventSetIntegerValueField(down, kCGEventSourceUserData, 0x4d51564f); CGEventSetIntegerValueField(up, kCGEventSourceUserData, 0x4d51564f); CGEventSetFlags(down, kCGEventFlagMaskCommand); CGEventSetFlags(up, kCGEventFlagMaskCommand); CGEventPostToPid(originalPid, down); CGEventPostToPid(originalPid, up); }
