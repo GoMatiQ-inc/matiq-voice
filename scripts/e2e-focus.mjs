@@ -14,19 +14,44 @@ try {
   const page = await app.firstWindow(); await page.locator('#first').waitFor();
   clipboardText = await app.evaluate(({clipboard}) => clipboard.readText());
   async function capture() { await app.evaluate(async () => { globalThis.verifyForeground();globalThis.focusTarget = await globalThis.startFocus(); }); }
-  await page.locator('#first').click(); await capture();
-  await app.evaluate(async ({clipboard}) => { clipboard.writeText('Native insertion E2E.'); await globalThis.focusTarget.paste('Native insertion E2E.'); });
-  await expect(page.locator('#first')).toHaveValue('Native insertion E2E.', {timeout: 5000});
-  await page.locator('#first').fill('Before 🌍 after');
-  await page.locator('#first').evaluate(field => { field.focus(); field.setSelectionRange(7, 9); });
+  const field = page.locator('#first');
+  async function position(text, start, end = start) {
+    await field.fill(text);
+    await field.evaluate((input, range) => { input.focus(); input.setSelectionRange(...range); }, [start, end]);
+    await capture();
+    expect(await field.evaluate(input => [input.selectionStart, input.selectionEnd])).toEqual([start, end]);
+  }
+  async function insert(text, expected, caret) {
+    await app.evaluate(async ({clipboard}, text) => { clipboard.writeText(text); await globalThis.focusTarget.paste(text); }, text);
+    await expect(field).toHaveValue(expected, {timeout: 5000});
+    await expect.poll(() => field.evaluate(input => [input.selectionStart, input.selectionEnd])).toEqual([caret, caret]);
+  }
+  await position('', 0);
+  await insert('Native insertion E2E.', 'Native insertion E2E.', 21);
+  for (const [caret, expected] of [[0, 'said Before 🌍 after'], [7, 'Before said 🌍 after'], [15, 'Before 🌍 aftersaid ']]) {
+    await position('Before 🌍 after', caret);
+    await insert('said ', expected, caret + 5);
+    await page.keyboard.press(process.platform === 'darwin' ? 'Meta+z' : 'Control+z');
+    await expect(field).toHaveValue('Before 🌍 after');
+  }
+  await position('Before 🌍 after', 9);
+  await insert(' first', 'Before 🌍 first after', 15);
   await capture();
-  await app.evaluate(async ({clipboard}) => { clipboard.writeText('world'); await globalThis.focusTarget.paste('world'); });
-  await expect(page.locator('#first')).toHaveValue('Before world after');
-  await page.locator('#first').fill(''); await page.locator('#first').click(); await capture(); await page.locator('#second').click();
+  await insert(' second', 'Before 🌍 first second after', 22);
+  await position('Before 🌍 after', 7, 9);
+  await insert('world ', 'Before world 🌍 after', 13);
+  await position('Keep this text', 5);
+  await field.evaluate(input => input.setSelectionRange(0, 0));
+  const moved = await app.evaluate(async ({clipboard}) => { clipboard.writeText('wrong'); try { await globalThis.focusTarget.paste('wrong'); return false; } catch { return true; } });
+  expect(moved).toBe(true);
+  await expect(field).toHaveValue('Keep this text');
+  await position('', 0);
+  await page.locator('#second').click();
   const rejected = await app.evaluate(async ({clipboard}) => { clipboard.writeText('Must not reach the wrong field.'); try { await globalThis.focusTarget.paste('Must not reach the wrong field.'); return false; } catch { return true; } });
-  if (!rejected) throw new Error('Changed text field was not rejected.');
-  await expect(page.locator('#first')).toHaveValue(''); await expect(page.locator('#second')).toHaveValue('');
-  console.log('PASS: native insertion into the selected field and Unicode selection replacement; changed field rejected without insertion.');
+  expect(rejected).toBe(true);
+  await expect(field).toHaveValue(''); await expect(page.locator('#second')).toHaveValue('');
+  console.log('PASS: native paste at beginning/middle/end, unchanged capture caret, Unicode, repeated insertion, preserved selection and Undo; moved caret/field rejected.');
+
 } finally {
   if (app) { await app.evaluate(({clipboard}) => globalThis.focusTarget?.cancel()).catch(() => {}); if (clipboardText !== undefined) await app.evaluate(({clipboard}, text) => clipboard.writeText(text), clipboardText).catch(() => {}); await app.close(); }
   await fs.rm(temporary, {recursive: true, force: true});

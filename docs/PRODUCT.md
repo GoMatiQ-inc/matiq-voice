@@ -53,8 +53,10 @@ The global shortcut starts a nonactivating HUD. Listening appears after the
 capture graph is ready. All audio samples through the final acknowledgement
 are retained; dictation is bounded at five minutes. The native input helper
 holds the original focused field for the session and checks it before posting
-a paste shortcut. Mac also checks the selected range when available. A changed
-or unsupported field falls back to Copy. Sending a shortcut is not proof that
+a paste shortcut. The selected range is checked before insertion. Native paste inserts at the
+original caret; highlighted text is preserved by collapsing to its start. The
+helper never rewrites the whole field. A changed or unsupported field falls
+back to Copy. Sending a shortcut is not proof that
 the destination accepted the text. Clipboard content is replaced for paste.
 
 ## Meetings
