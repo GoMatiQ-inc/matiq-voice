@@ -150,7 +150,7 @@ try {
   await scenario('close runs in the tray and reopening restores the Mac Dock icon', async () => {
     await desktop.evaluate(({BrowserWindow}) => BrowserWindow.getAllWindows().find(window => window.getTitle() === 'MatiQ Voice').close());
     assert.equal(await desktop.evaluate(({BrowserWindow}) => BrowserWindow.getAllWindows().find(window => window.getTitle() === 'MatiQ Voice').isVisible()), false);
-    if (process.platform === 'darwin') assert.equal(await desktop.evaluate(({app}) => app.dock.isVisible()), false);
+    if (process.platform === 'darwin') await expect.poll(() => desktop.evaluate(({app}) => app.dock.isVisible())).toBe(false);
     await desktop.evaluate(({app}) => app.emit('activate'));
     await expect.poll(() => desktop.evaluate(({BrowserWindow}) => BrowserWindow.getAllWindows().find(window => window.getTitle() === 'MatiQ Voice').isVisible())).toBe(true);
     if (process.platform === 'darwin') await expect.poll(() => desktop.evaluate(({app}) => app.dock.isVisible())).toBe(true);
