@@ -226,3 +226,10 @@ inferred from those fixture tests.
   main-window close/reopen with Mac Dock visibility. CI retains indicator images.
   Native CI results must pass before the new installer is published.
 - Windows organization verification remains a separate Microsoft approval gate.
+
+- [Native indicator CI 42062478847](https://github.com/GoMatiQ-inc/matiq-voice/actions/runs/42062478847)
+  passed both Mac arm64 and Windows x64 E2E, packaging and packaged native
+  inference for the 0.3.5 changes. The new waveform/placement/focus and
+  close/reopen scenarios passed; Mac Dock visibility is checked after the
+  asynchronous OS transition settles. Quiet/recording screenshots are retained
+  in CI. This completes the native checks requested in the preceding notes.
