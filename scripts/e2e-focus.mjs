@@ -4,16 +4,24 @@ import {createRequire} from 'node:module';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
+import {execFile} from 'node:child_process';
+import {promisify} from 'node:util';
+const run = promisify(execFile);
 const require = createRequire(import.meta.url), root = path.resolve(import.meta.dirname, '..');
 const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'matiq-focus-'));
 let app, clipboardText;
 try {
   await fs.writeFile(path.join(temporary, 'fixture.html'), '<!doctype html><html><title>MatiQ Voice focus test</title><body><label>First text field<textarea id="first"></textarea></label><label>Second text field<textarea id="second"></textarea></label></body></html>');
-  await fs.writeFile(path.join(temporary, 'entry.cjs'), `const {app,BrowserWindow,Menu}=require('electron');app.setName('MatiQ Voice Focus Test');globalThis.verifyForeground=()=>{if(process.platform==='darwin'){const actual=Number(require('node:child_process').execFileSync(${JSON.stringify(path.join(root, 'engine/mac-input'))},['capture'],{encoding:'utf8'}).trim());if(actual!==process.pid)throw new Error('Test window is not the foreground app; no key events will be posted.');}};globalThis.startFocus=()=>require(${JSON.stringify(path.join(root, 'src/input.cjs'))}).captureTarget(${JSON.stringify(process.platform === 'darwin' ? path.join(root, 'engine/mac-input') : 'powershell.exe')},${JSON.stringify(process.platform === 'darwin' ? ['session'] : ['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',path.join(root,'native/windows-input.ps1'),'-Action','session'])});app.setPath('userData',${JSON.stringify(path.join(temporary, 'profile'))});app.whenReady().then(()=>{app.accessibilitySupportEnabled=true;Menu.setApplicationMenu(Menu.buildFromTemplate([{role:'appMenu'},{role:'editMenu'}]));const win=new BrowserWindow({width:700,height:500,webPreferences:{nodeIntegration:false,contextIsolation:true}});win.loadFile(${JSON.stringify(path.join(temporary, 'fixture.html'))});win.show();app.focus({steal:true});win.focus();});`);
+  await fs.writeFile(path.join(temporary, 'entry.cjs'), `const {app,BrowserWindow,Menu}=require('electron');app.setName('MatiQ Voice Focus Test');globalThis.verifyForeground=()=>{if(process.platform==='darwin'){const actual=Number(require('node:child_process').execFileSync(${JSON.stringify(path.join(root, 'engine/mac-input'))},['capture'],{encoding:'utf8'}).trim());if(actual!==process.pid)throw new Error('Test window is not the foreground app; no key events will be posted.');}};globalThis.startFocus=()=>require(${JSON.stringify(path.join(root, 'src/input.cjs'))}).captureTarget(${JSON.stringify(process.platform === 'darwin' ? path.join(root, 'engine/mac-input') : 'powershell.exe')},${JSON.stringify(process.platform === 'darwin' ? ['session'] : ['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',path.join(root,'native/windows-input.ps1'),'-Action','session'])});app.setPath('userData',${JSON.stringify(path.join(temporary, 'profile'))});globalThis.startKeyboard=async()=>{globalThis.keyEvents=[];globalThis.keyboard=new(require(${JSON.stringify(path.join(root,'src/keyboard.cjs'))}).Keyboard)({engineDir:${JSON.stringify(path.join(root,'engine'))},nativeDir:${JSON.stringify(path.join(root,'native'))},bindings:{toggle:['ArrowLeft','ArrowRight','ArrowUp'],hold:[]},emit:event=>globalThis.keyEvents.push(event)});await globalThis.keyboard.start();};app.whenReady().then(()=>{app.accessibilitySupportEnabled=true;Menu.setApplicationMenu(Menu.buildFromTemplate([{role:'appMenu'},{role:'editMenu'}]));const win=new BrowserWindow({width:700,height:500,webPreferences:{nodeIntegration:false,contextIsolation:true}});win.loadFile(${JSON.stringify(path.join(temporary, 'fixture.html'))});win.show();app.focus({steal:true});win.focus();});`);
   app = await electron.launch({executablePath: require('electron'), args: ['--force-renderer-accessibility', path.join(temporary, 'entry.cjs')]});
   const page = await app.firstWindow(); await page.locator('#first').waitFor();
   clipboardText = await app.evaluate(({clipboard}) => clipboard.readText());
-  async function capture() { await app.evaluate(async () => { globalThis.verifyForeground();globalThis.focusTarget = await globalThis.startFocus(); }); }
+  async function capture() {
+    await expect.poll(async () => {
+      try { await app.evaluate(async () => { globalThis.verifyForeground(); globalThis.focusTarget = await globalThis.startFocus(); }); return 'ready'; }
+      catch (error) { return error.message; }
+    }, {timeout: 10000}).toBe('ready');
+  }
   const field = page.locator('#first');
   async function position(text, start, end = start) {
     await field.fill(text);
@@ -50,9 +58,33 @@ try {
   const rejected = await app.evaluate(async ({clipboard}) => { clipboard.writeText('Must not reach the wrong field.'); try { await globalThis.focusTarget.paste('Must not reach the wrong field.'); return false; } catch { return true; } });
   expect(rejected).toBe(true);
   await expect(field).toHaveValue(''); await expect(page.locator('#second')).toHaveValue('');
+  if (process.platform === 'darwin') {
+    const injector = path.join(temporary, 'key-events');
+    await run('clang', ['-O2', '-framework', 'Cocoa', '-framework', 'ApplicationServices', path.join(root, 'test/fixtures/mac-key-events.m'), '-o', injector], {timeout: 30000});
+    await app.evaluate(() => globalThis.startKeyboard());
+    await page.evaluate(() => { window.nativeKeys = []; document.addEventListener('keydown', event => window.nativeKeys.push(event.key)); });
+    await field.fill('Before after');
+    await field.evaluate(input => { input.focus(); input.setSelectionRange(7, 7); });
+    async function keys(...events) {
+      const pid = await app.evaluate(() => { globalThis.verifyForeground(); return process.pid; });
+      await run(injector, [String(pid), ...events], {timeout: 5000});
+    }
+    await keys('123d', '124d', '126d', '126u', '124u', '123u');
+    await expect.poll(() => app.evaluate(() => globalThis.keyEvents.filter(event => event.type === 'toggle').length)).toBe(1);
+    expect(await field.evaluate(input => input.selectionStart)).toBe(7);
+    expect(await page.evaluate(() => window.nativeKeys)).toEqual([]);
+    await keys('123d', '123u');
+    await expect.poll(() => field.evaluate(input => input.selectionStart)).toBe(6);
+    await keys('123d', '123r', '123u');
+    await expect.poll(() => field.evaluate(input => input.selectionStart)).toBe(4);
+    await keys('123d', '124d', '124u', '123u');
+    await expect.poll(() => field.evaluate(input => input.selectionStart)).toBe(4);
+    console.log('PASS: native arrow chord leaves the caret unchanged; individual arrows, repeat and incomplete chords retain navigation.');
+    await app.evaluate(() => globalThis.keyboard.stop());
+  }
   console.log('PASS: native paste at beginning/middle/end, unchanged capture caret, Unicode, repeated insertion, preserved selection and Undo; moved caret/field rejected.');
 
 } finally {
-  if (app) { await app.evaluate(({clipboard}) => globalThis.focusTarget?.cancel()).catch(() => {}); if (clipboardText !== undefined) await app.evaluate(({clipboard}, text) => clipboard.writeText(text), clipboardText).catch(() => {}); await app.close(); }
+  if (app) { await app.evaluate(({clipboard}) => (globalThis.focusTarget?.cancel(), globalThis.keyboard?.stop())).catch(() => {}); if (clipboardText !== undefined) await app.evaluate(({clipboard}, text) => clipboard.writeText(text), clipboardText).catch(() => {}); await app.close(); }
   await fs.rm(temporary, {recursive: true, force: true});
 }

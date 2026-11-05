@@ -233,3 +233,19 @@ inferred from those fixture tests.
   close/reopen scenarios passed; Mac Dock visibility is checked after the
   asynchronous OS transition settles. Quiet/recording screenshots are retained
   in CI. This completes the native checks requested in the preceding notes.
+
+## Caret-preserving insertion (2026-11-05)
+
+- 46 Node tests pass under Linux. Native Mac tests exercise actual Accessibility,
+  event taps and editor paste in an isolated Electron text-field fixture.
+- Mac tests pass beginning/middle/end insertion, unchanged caret during target
+  capture, repeated insertion, Unicode, preserved highlighted text, native Undo,
+  and rejection after caret or field changes.
+- The native Mac shortcut test passes an arrow-key chord without moving the
+  caret or leaking keydowns. Individual arrows, auto-repeat and incomplete
+  chords retain navigation. Mac partial chords defer their typing keys until
+  completion, release or repeat; modifier events continue to the OS.
+- The native test ran with a 120-second watchdog and tracked its owned processes
+  and actual inspector listeners. Independent teardown checks found no owned
+  processes or listeners remaining. Windows native caret checks are now part
+  of CI; their result and signed installer qualification remain pending.

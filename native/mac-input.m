@@ -1,5 +1,6 @@
 #import <Cocoa/Cocoa.h>
 #import <ApplicationServices/ApplicationServices.h>
+#import <unistd.h>
 
 static AXError focusedElement(AXUIElementRef system, CFTypeRef *element) {
     AXError error = AXUIElementCopyAttributeValue(system, kAXFocusedUIElementAttribute, element);
@@ -59,7 +60,7 @@ int main(int argc, const char *argv[]) {
                 // Let pending accessibility focus notifications settle before posting keys.
                 CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.15, false);
                 CFTypeRef current = NULL;
-                bool same = focusedElement(system, &current) == kAXErrorSuccess && current && CFEqual(current, original);
+                bool same = NSWorkspace.sharedWorkspace.frontmostApplication.processIdentifier == originalPid && focusedElement(system, &current) == kAXErrorSuccess && current && CFEqual(current, original);
                 if (current) CFRelease(current);
                 if (same && hasRange) {
                     CFTypeRef value = NULL; CFRange range;
@@ -78,15 +79,28 @@ int main(int argc, const char *argv[]) {
                         AXValueRef selected = AXValueCreate(kAXValueCFRangeType, &caret);
                         AXError collapsed = AXUIElementSetAttributeValue((AXUIElementRef)original, kAXSelectedTextRangeAttribute, selected);
                         CFRelease(selected);
-                        CFTypeRef verified = NULL; CFRange range;
-                        bool preserved = collapsed == kAXErrorSuccess && AXUIElementCopyAttributeValue((AXUIElementRef)original, kAXSelectedTextRangeAttribute, &verified) == kAXErrorSuccess && verified && AXValueGetValue((AXValueRef)verified, kAXValueCFRangeType, &range) && range.location == originalRange.location && range.length == 0;
-                        if (verified) CFRelease(verified);
+                        bool preserved = false;
+                        for (int attempt = 0; collapsed == kAXErrorSuccess && !preserved && attempt < 20; attempt++) {
+                            CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.01, false);
+                            CFTypeRef verified = NULL; CFRange range;
+                            preserved = AXUIElementCopyAttributeValue((AXUIElementRef)original, kAXSelectedTextRangeAttribute, &verified) == kAXErrorSuccess && verified && AXValueGetValue((AXValueRef)verified, kAXValueCFRangeType, &range) && range.location == originalRange.location && range.length == 0;
+                            if (verified) CFRelease(verified);
+                        }
                         if (!preserved) { CFRelease(original); CFRelease(system); fprintf(stderr, "The selected text cannot be preserved safely. Use Copy.\n"); return 78; }
                     }
-                    CGEventRef down = CGEventCreateKeyboardEvent(NULL, 9, true), up = CGEventCreateKeyboardEvent(NULL, 9, false);
-                    if (!down || !up) result = 79;
-                    else { CGEventSetIntegerValueField(down, kCGEventSourceUserData, 0x4d51564f); CGEventSetIntegerValueField(up, kCGEventSourceUserData, 0x4d51564f); CGEventSetFlags(down, kCGEventFlagMaskCommand); CGEventSetFlags(up, kCGEventFlagMaskCommand); CGEventPostToPid(originalPid, down); CGEventPostToPid(originalPid, up); }
-                    if (down) CFRelease(down); if (up) CFRelease(up);
+                    CGEventSourceRef source = CGEventSourceCreate(kCGEventSourceStatePrivate);
+                    CGEventRef commandDown = CGEventCreateKeyboardEvent(source, 55, true), down = CGEventCreateKeyboardEvent(source, 9, true), up = CGEventCreateKeyboardEvent(source, 9, false), commandUp = CGEventCreateKeyboardEvent(source, 55, false);
+                    if (!commandDown || !down || !up || !commandUp) result = 79;
+                    else {
+                        CGEventRef events[] = {commandDown, down, up, commandUp};
+                        for (int i = 0; i < 4; i++) {
+                            CGEventSetIntegerValueField(events[i], kCGEventSourceUserData, 0x4d51564f);
+                            CGEventSetFlags(events[i], i == 3 ? 0 : kCGEventFlagMaskCommand);
+                            CGEventPost(kCGHIDEventTap, events[i]);
+                            usleep(10000);
+                        }
+                    }
+                    if (commandDown) CFRelease(commandDown); if (down) CFRelease(down); if (up) CFRelease(up); if (commandUp) CFRelease(commandUp); if (source) CFRelease(source);
                 }
             }
             CFRelease(original); CFRelease(system); return result;
