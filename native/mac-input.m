@@ -88,6 +88,10 @@ int main(int argc, const char *argv[]) {
                         }
                         if (!preserved) { CFRelease(original); CFRelease(system); fprintf(stderr, "The selected text cannot be preserved safely. Use Copy.\n"); return 78; }
                     }
+                    CGEventFlags modifiers = CGEventSourceFlagsState(kCGEventSourceStateHIDSystemState) & (kCGEventFlagMaskCommand | kCGEventFlagMaskControl | kCGEventFlagMaskAlternate | kCGEventFlagMaskShift);
+                    if (modifiers || NSWorkspace.sharedWorkspace.frontmostApplication.processIdentifier != originalPid) {
+                        CFRelease(original); CFRelease(system); fprintf(stderr, "Release modifier keys and keep the original field focused. Use Copy.\n"); return 78;
+                    }
                     CGEventSourceRef source = CGEventSourceCreate(kCGEventSourceStatePrivate);
                     CGEventRef commandDown = CGEventCreateKeyboardEvent(source, 55, true), down = CGEventCreateKeyboardEvent(source, 9, true), up = CGEventCreateKeyboardEvent(source, 9, false), commandUp = CGEventCreateKeyboardEvent(source, 55, false);
                     if (!commandDown || !down || !up || !commandUp) result = 79;
@@ -96,7 +100,7 @@ int main(int argc, const char *argv[]) {
                         for (int i = 0; i < 4; i++) {
                             CGEventSetIntegerValueField(events[i], kCGEventSourceUserData, 0x4d51564f);
                             CGEventSetFlags(events[i], i == 3 ? 0 : kCGEventFlagMaskCommand);
-                            CGEventPost(kCGHIDEventTap, events[i]);
+                            CGEventPostToPid(originalPid, events[i]);
                             usleep(10000);
                         }
                     }

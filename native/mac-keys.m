@@ -23,7 +23,7 @@ static CGEventRef keyboard(CGEventTapProxy proxy, CGEventType type, CGEventRef e
     @autoreleasepool {
     if(type==kCGEventTapDisabledByTimeout || type==kCGEventTapDisabledByUserInput) {
         [pressed removeAllObjects]; [swallowed removeAllObjects];
-        for (NSNumber *key in pendingOrder.array) releasePending(proxy, key, NO);
+        for (NSNumber *key in [[pendingOrder.array copy] autorelease]) releasePending(proxy, key, NO);
         output(@{@"reset":@YES}); CGEventTapEnable(tap,true); return event;
     }
     if(CGEventGetIntegerValueField(event,kCGEventSourceUserData)==0x4d51564f || CGEventGetIntegerValueField(event,kCGEventSourceUnixProcessID)==getpid()) return event;
@@ -63,7 +63,7 @@ static CGEventRef keyboard(CGEventTapProxy proxy, CGEventType type, CGEventRef e
                 consume=YES;
             } else {
                 // A repeat is ordinary navigation; unrelated input ends a prefix.
-                for(NSNumber *key in pendingOrder.array) releasePending(proxy, key, YES);
+                for(NSNumber *key in [[pendingOrder.array copy] autorelease]) releasePending(proxy, key, YES);
             }
         }
         if(consume && !pending[number]) [swallowed addObject:number];
@@ -97,7 +97,7 @@ int main(int argc, const char *argv[]) {
                 CFRunLoopPerformBlock(CFRunLoopGetMain(),kCFRunLoopCommonModes,^{
                     [bindings release]; bindings=[(config[@"bindings"]?:@[]) copy];learning=[config[@"learning"] boolValue];
                     [pressed removeAllObjects];
-                    for(NSNumber *key in pendingOrder.array) releasePending(NULL, key, NO);
+                    for(NSNumber *key in [[pendingOrder.array copy] autorelease]) releasePending(NULL, key, NO);
                 }); CFRunLoopWakeUp(CFRunLoopGetMain());
                 }
             }

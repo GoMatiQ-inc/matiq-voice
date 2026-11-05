@@ -69,7 +69,7 @@ try {
       const pid = await app.evaluate(() => { globalThis.verifyForeground(); return process.pid; });
       await run(injector, [String(pid), ...events], {timeout: 5000});
     }
-    await keys('123d', '124d', '126d', '126u', '124u', '123u');
+    await keys('126d', '123d', '124d', '124u', '123u', '126u');
     await expect.poll(() => app.evaluate(() => globalThis.keyEvents.filter(event => event.type === 'toggle').length)).toBe(1);
     expect(await field.evaluate(input => input.selectionStart)).toBe(7);
     expect(await page.evaluate(() => window.nativeKeys)).toEqual([]);
@@ -79,6 +79,10 @@ try {
     await expect.poll(() => field.evaluate(input => input.selectionStart)).toBe(4);
     await keys('123d', '124d', '124u', '123u');
     await expect.poll(() => field.evaluate(input => input.selectionStart)).toBe(4);
+    await field.evaluate(input => input.setSelectionRange(7, 7));
+    await keys('126d', '124d', '7d', '7u', '124u', '126u');
+    await expect(field).toHaveValue('Bxefore after');
+    expect(await app.evaluate(() => globalThis.keyEvents.some(event => event.type === 'keyboard-status' && !event.ready))).toBe(false);
     console.log('PASS: native arrow chord leaves the caret unchanged; individual arrows, repeat and incomplete chords retain navigation.');
     await app.evaluate(() => globalThis.keyboard.stop());
   }
