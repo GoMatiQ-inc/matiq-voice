@@ -8,3 +8,5 @@ engine/*
 !engine/.gitkeep
 *.log
 .DS_Store
+
+/family-companion/
