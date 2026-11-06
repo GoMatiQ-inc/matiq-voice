@@ -47,3 +47,11 @@ test('concurrent checks are serialized and installation failures are visible', a
   assert.throws(()=>f.service.install(),/Installer unavailable/); assert.equal(f.service.installing,false);
   assert.equal(f.service.status.phase,'error');
 });
+
+test('asynchronous native install failure remains visible and cannot resume audio before reopening', async () => {
+  const f=fixture(); await f.service.check(); f.service.install();
+  assert.equal(f.service.status.phase,'installing');
+  f.updater.emit('error',new Error('Signature rejected'));
+  assert.equal(f.service.installing,true);
+  assert.match(f.service.status.message,/Quit and reopen/);
+});

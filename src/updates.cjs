@@ -4,7 +4,7 @@ function createUpdates({updater, enabled, isIdle, emit}) {
   let busy = false, downloaded = false, installing = false;
   const listeners = [];
   const publish = patch => { status = {...status, ...patch}; emit({...status}); };
-  const fail = error => publish({phase: 'error', message: `Update failed. Check your connection and try again: ${error.message}`});
+  const fail = error => publish({phase: 'error', message: installing ? `Update installation failed: ${error.message}. Quit and reopen MatiQ Voice before recording again.` : `Update failed. Check your connection and try again: ${error.message}`});
   if (enabled) {
     updater.autoDownload = false;
     updater.autoInstallOnAppQuit = false;
@@ -37,6 +37,7 @@ function createUpdates({updater, enabled, isIdle, emit}) {
     if (!enabled || !downloaded || installing) throw new Error('Download an update before restarting.');
     if (!isIdle()) throw new Error('Finish dictation, meeting recording and transcription before restarting to update.');
     installing = true;
+    publish({phase: 'installing', message: 'Verifying the update and restarting MatiQ Voice…'});
     try { updater.quitAndInstall(false, true); }
     catch (error) { installing = false; fail(error); throw error; }
   }

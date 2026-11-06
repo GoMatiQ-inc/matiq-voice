@@ -210,6 +210,7 @@ async function start(options) {
     return {ready:keyboard.ready};
   });
   handle('download', async () => {
+    if (updates.installing) throw new Error('MatiQ Voice is restarting to update.');
     if (state !== 'idle') throw new Error('Finish the current operation first.');
     operation = new AbortController(); setState('downloading');
     const speech = {...MODELS[settings.model], file: `ggml-${settings.model}.bin`, url: `https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-${settings.model}.bin`};
