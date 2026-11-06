@@ -28,7 +28,9 @@ int main(int argc, const char *argv[]) {
             pid_t requestedPid = NSWorkspace.sharedWorkspace.frontmostApplication.processIdentifier;
             AXUIElementRef application = AXUIElementCreateApplication(requestedPid);
             // Electron exposes its renderer tree on request; native apps may not support this attribute.
-            AXUIElementSetAttributeValue(application, CFSTR("AXManualAccessibility"), kCFBooleanTrue);
+            AXError activated = AXUIElementSetAttributeValue(application, CFSTR("AXManualAccessibility"), kCFBooleanTrue);
+            if (activated == kAXErrorAttributeUnsupported)
+                AXUIElementSetAttributeValue(application, CFSTR("AXEnhancedUserInterface"), kCFBooleanTrue);
             CFRelease(application);
             CFTypeRef original = NULL;
             // Electron debounces this request for two seconds; allow its tree to initialize.
