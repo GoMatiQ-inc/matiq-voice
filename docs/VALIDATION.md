@@ -333,3 +333,34 @@ real Whisper/ONNX inference, shared-cache adoption and second-profile reuse,
 Windows native caret insertion, packaging and packaged native inference.
 The 0.3.9 candidate adds explicit packaged cache/adoption assertions and owned
 process/port cleanup checks; those additions require their own CI result.
+
+## Cold-editor automatic paste (2026-11-06)
+
+- The previous Mac focus fixture forced renderer accessibility on. Removing
+  that override reproduced a focused-field capture failure in a normal
+  Electron editor. The native helper now requests AXManualAccessibility and
+  falls back to Chromium's AXEnhancedUserInterface when the Electron attribute
+  is unsupported, and waits up to three seconds for the delayed accessibility tree,
+  rejecting a foreground-app change during initialization.
+- Three consecutive native Mac runs pass cold-editor capture, actual rich-text
+  insertion, delayed paste with a separate nonactivating overlay, Unicode,
+  beginning/middle/end insertion, preserved highlighted text, Undo, and rejection
+  after cursor/field changes. All 55 Node tests pass on Linux after merging
+  the approved model-sharing change.
+- A separate cold Chrome probe reproduced the same capture failure. The native
+  test now verifies actual insertion into an owned Chrome textarea at its
+  existing middle caret; the corrected helper passes this check.
+- No dictation text or editor contents are logged. Existing permission grants
+  are still required. The installed user's destination app and signed update
+  have not yet been qualified with this change.
+
+
+The complete app flow also passes on the merged source: public JFK fixture audio
+runs through the actual begin/recording/transcribe handlers and local Medium
+English recognition, then automatically inserts at an owned Chrome field's
+existing middle caret with the real overlay visible. This uses injected known
+audio and a keyboard protocol fixture, not a physical microphone or key press.
+The isolated profile/cache is removed, clipboard text restored, and the owned
+app process plus two captured inspector listeners are independently absent.
+Cold editor activation/overlay cases run only on Mac; Windows retains its
+established renderer accessibility setup and native caret insertion checks.
