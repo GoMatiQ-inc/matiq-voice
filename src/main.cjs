@@ -1,4 +1,4 @@
-const {app, BrowserWindow, Menu, Tray, nativeImage, globalShortcut, ipcMain, clipboard, session, systemPreferences, shell, dialog, safeStorage, desktopCapturer, utilityProcess, powerSaveBlocker, powerMonitor, screen} = require('electron');
+const {app, BrowserWindow, Menu, Tray, nativeImage, globalShortcut, ipcMain, clipboard, session, systemPreferences, shell, dialog, safeStorage, desktopCapturer, utilityProcess, powerSaveBlocker, powerMonitor, screen, autoUpdater: nativeUpdater} = require('electron');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const {pathToFileURL} = require('node:url');
@@ -105,6 +105,7 @@ async function start(options) {
   ]));
   tray.on('double-click', show); updateTray();
   win.on('close', event => { if (!quitting) { event.preventDefault(); win.hide(); } });
+  nativeUpdater.on('before-quit-for-update', () => { if (updates.installing) quitting = true; });
   app.on('activate', show); app.on('second-instance', show);
   app.on('before-quit', event => {
     if (activeMeeting && ['meeting-recording', 'meeting-preparing', 'meeting-paused'].includes(state) && !quitting) { event.preventDefault(); send({type: 'quit-after-meeting'}); show(); return; }
