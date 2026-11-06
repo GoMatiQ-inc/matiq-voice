@@ -16,6 +16,18 @@ const fixtures = process.env.MATIQ_E2E_FIXTURES || path.join(root, '.validation'
 const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'matiq-e2e-'));
 const profile = path.join(temporary, 'profile'), authorizeFile = path.join(temporary, 'authorization-url.txt');
 const results = [], pageErrors = [], proof = new Map();
+if (!process.env.MATIQ_COMPANION_SOURCE) throw new Error('Set MATIQ_COMPANION_SOURCE to the qualified Companion checkout before running the family integration suite.');
+const companionRoot = path.resolve(process.env.MATIQ_COMPANION_SOURCE);
+const {ModelStore, sharedRoot: companionSharedRoot} = require(path.join(companionRoot,'src/models.cjs'));
+const lifecycle = require(path.join(companionRoot,'scripts/fixture-lifecycle.cjs'));
+const {sharedRoot, speechAsset, adoptExistingAssets} = require('../src/shared-models.cjs');
+const {SPEAKER_MODELS} = require('../src/assets.cjs');
+const familyRoot = path.join(temporary,'family-models'), familyStore = new ModelStore(familyRoot);
+const familyAssets = [speechAsset('base.en'),...SPEAKER_MODELS];
+const ownedDesktops = [];
+let browserServer, ownedBrowser, fixturePort, modelRequests = 0;
+const watchdog = setTimeout(()=>{ desktop?.process().kill(); browserServer?.process().kill(); server?.closeAllConnections(); server?.close(); process.exitCode=1; },12*60*1000);
+
 let desktop, browser, server, failedDownload = true;
 function canonicalWav(wav) {
   let offset = 12;
@@ -29,8 +41,9 @@ async function boot() {
   const entry = path.join(temporary, 'bootstrap.cjs');
   const base = `http://127.0.0.1:${server.address().port}`;
   const endpoints = Object.fromEntries(['microsoft', 'google'].map(id => [id, Object.fromEntries(['authorize', 'token', 'profile', 'events', 'revoke'].map(key => [key, `${base}/${id}/${key}`]))]));
-  await fs.writeFile(entry, `const {app}=require('electron');const fs=require('node:fs/promises');app.setPath('userData',${JSON.stringify(profile)});require(${JSON.stringify(path.join(root, 'src/main.cjs'))}).launch({updater:(()=>{const u=new(require('node:events').EventEmitter)();u.setFeedURL=()=>{};u.checkForUpdates=async()=>({cancellationToken:{},updateInfo:{version:'99.0.0'}});u.downloadUpdate=async()=>u.emit('update-downloaded',{version:'99.0.0'});u.quitAndInstall=()=>{globalThis.__updateInstalled=true;setTimeout(()=>{const {autoUpdater,BrowserWindow}=require('electron');autoUpdater.emit('before-quit-for-update');BrowserWindow.getAllWindows().find(w=>w.getTitle()==='MatiQ Voice').close();},100);};return u;})(),keyboardSpawn:()=>{const child=new(require('node:events').EventEmitter)();const Stream=require('node:stream').PassThrough;child.stdout=new Stream();child.stderr=new Stream();child.stdin=new Stream();child.kill=()=>child.emit('close',0);globalThis.__keyboardFixture=child;queueMicrotask(()=>child.stdout.write(JSON.stringify({ready:true})+'\\n'));return child;},oauthConfig:{microsoft:{clientId:'fixture-microsoft'},google:{clientId:'fixture-google'}},testEndpoints:${JSON.stringify(endpoints)},openBrowser:async url=>fs.writeFile(${JSON.stringify(authorizeFile)},url),inspectHardware:async(directory,engine)=>{const h=await require(${JSON.stringify(path.join(root, 'src/hardware.cjs'))}).inspectHardware(directory,engine);const recommend=require(${JSON.stringify(path.join(root, 'src/hardware.cjs'))}).recommendModel;return {...h,memoryBytes:4*1024**3,cores:2,recommendation:recommend({platform:process.platform,arch:process.arch,memoryBytes:4*1024**3,cores:2})};},downloadAsset:async(asset,...rest)=>require(${JSON.stringify(path.join(root, 'src/assets.cjs'))}).downloadAsset({...asset,url:${JSON.stringify(base)}+'/models/'+asset.file},...rest)});`);
+  await fs.writeFile(entry, `const {app}=require('electron');const fs=require('node:fs/promises');app.setPath('userData',${JSON.stringify(profile)});require(${JSON.stringify(path.join(root, 'src/main.cjs'))}).launch({updater:(()=>{const u=new(require('node:events').EventEmitter)();u.setFeedURL=()=>{};u.checkForUpdates=async()=>({cancellationToken:{},updateInfo:{version:'99.0.0'}});u.downloadUpdate=async()=>u.emit('update-downloaded',{version:'99.0.0'});u.quitAndInstall=()=>{globalThis.__updateInstalled=true;setTimeout(()=>{const {autoUpdater,BrowserWindow}=require('electron');autoUpdater.emit('before-quit-for-update');BrowserWindow.getAllWindows().find(w=>w.getTitle()==='MatiQ Voice').close();},100);};return u;})(),keyboardSpawn:()=>{const child=new(require('node:events').EventEmitter)();const Stream=require('node:stream').PassThrough;child.stdout=new Stream();child.stderr=new Stream();child.stdin=new Stream();child.kill=()=>child.emit('close',0);globalThis.__keyboardFixture=child;queueMicrotask(()=>child.stdout.write(JSON.stringify({ready:true})+'\\n'));return child;},oauthConfig:{microsoft:{clientId:'fixture-microsoft'},google:{clientId:'fixture-google'}},testEndpoints:${JSON.stringify(endpoints)},openBrowser:async url=>fs.writeFile(${JSON.stringify(authorizeFile)},url),inspectHardware:async(directory,engine)=>{const h=await require(${JSON.stringify(path.join(root, 'src/hardware.cjs'))}).inspectHardware(directory,engine);const recommend=require(${JSON.stringify(path.join(root, 'src/hardware.cjs'))}).recommendModel;return {...h,memoryBytes:4*1024**3,cores:2,recommendation:recommend({platform:process.platform,arch:process.arch,memoryBytes:4*1024**3,cores:2})};},sharedModelRoot:${JSON.stringify(familyRoot)},downloadAsset:async(asset,directory,progress,signal)=>require(${JSON.stringify(path.join(root, 'src/shared-models.cjs'))}).sharedDownloadAsset({...asset,url:${JSON.stringify(base)}+'/models/'+asset.file},directory,progress,signal,${JSON.stringify(familyRoot)})});`);
   desktop = await electron.launch({executablePath: require('electron'), cwd: root, args: [entry, '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--autoplay-policy=no-user-gesture-required']});
+  ownedDesktops.push(lifecycle.capture(desktop.process()));
   await expect.poll(() => desktop.windows().some(page => page.url().endsWith('/index.html')), {timeout: 15000}).toBe(true);
   const page = desktop.windows().find(value => value.url().endsWith('/index.html'));
   page.on('pageerror', error => pageErrors.push(error.message));
@@ -71,6 +84,7 @@ try {
     try {
       const url = new URL(req.url, 'http://localhost');
       if (url.pathname.startsWith('/models/')) {
+        modelRequests++;
         if (failedDownload) { failedDownload = false; res.writeHead(503); res.end('fixture interrupted download'); return; }
         const file = files.get(decodeURIComponent(url.pathname.slice(8))); if (!file) { res.writeHead(404); res.end(); return; }
         res.writeHead(200, {'Content-Type': 'application/octet-stream', 'Content-Length': (await fs.stat(file)).size}); createReadStream(file).pipe(res); return;
@@ -101,7 +115,10 @@ try {
     } catch (error) { res.writeHead(500); res.end(JSON.stringify({error: 'fixture_error'})); console.error('Fixture assertion:', error.message); }
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-  browser = await chromium.launch({channel: process.env.MATIQ_E2E_BROWSER_CHANNEL || 'chrome', headless: true});
+  fixturePort = server.address().port;
+  browserServer = await chromium.launchServer({channel: process.env.MATIQ_E2E_BROWSER_CHANNEL || 'chrome', headless: true});
+  ownedBrowser = lifecycle.capture(browserServer.process());
+  browser = await chromium.connect(browserServer.wsEndpoint());
   let page = await boot();
   await scenario('fresh install checks hardware and recommends an English model', async () => {
     await expect(page.locator('#setup-dialog')).toBeVisible(); await expect(page.locator('#setup-title')).toHaveText('Check this computer');
@@ -113,6 +130,23 @@ try {
     await page.locator('#setup-download').click(); await expect(page.locator('#setup-error')).toContainText('503'); await expect(page.locator('#setup-next')).toBeDisabled();
     await page.locator('#setup-download').click(); await expect(page.locator('#setup-download-label')).toContainText('All required models', {timeout: 120000});
     const status = await page.evaluate(() => window.matiqVoice.status()); assert.equal(status.modelReady && status.speakerReady, true); await page.locator('#setup-next').click();
+  });
+  await scenario('Voice and Companion share verified speech assets without confusing them with LLMs',async()=>{
+    assert.equal(sharedRoot(),companionSharedRoot());
+    const inventory=await familyStore.inventory();
+    assert.equal(inventory.length,3);
+    assert.deepEqual(inventory.map(m=>m.kind).sort(),['asr','speaker','speaker']);
+    const before=modelRequests, secondProfile=path.join(temporary,'second-voice-models');
+    assert.equal((await adoptExistingAssets(familyAssets,secondProfile,familyRoot)).length,3);
+    for(const asset of familyAssets) {
+      const model={...asset,kind:asset.file.startsWith('ggml-')?'asr':'speaker'};
+      assert.equal(await familyStore.verify(model),true);
+      const original=await fs.stat(path.join(profile,'models',asset.file),{bigint:true});
+      const reused=await fs.stat(path.join(secondProfile,asset.file),{bigint:true});
+      assert.equal(original.ino,reused.ino); assert.equal(original.dev,reused.dev);
+    }
+    assert.equal(modelRequests,before);
+    assert.equal((await page.evaluate(()=>window.matiqVoice.status())).sharedModels.length,3);
   });
   await scenario('microphone check captures synthetic audio before setup completes', async () => {
     await page.locator('#setup-test-microphone').click(); await expect(page.locator('#setup-content')).toContainText('Audio signal detected', {timeout: 15000});
@@ -244,7 +278,12 @@ try {
   await scenario('closing hides the window; restart preserves setup, credentials, speakers and notes', async () => {
     await desktop.evaluate(({BrowserWindow}) => BrowserWindow.getAllWindows().find(window => window.getTitle() === 'MatiQ Voice').close());
     assert.equal(await desktop.evaluate(({BrowserWindow}) => BrowserWindow.getAllWindows().find(window => window.getTitle() === 'MatiQ Voice').isVisible()), false);
-    await desktop.close(); desktop = null; page = await boot(); await expect(page.locator('#setup-dialog')).not.toBeVisible();
+    const before=modelRequests;
+    await fs.unlink(familyStore.location({...speechAsset('base.en'),kind:'asr'}));
+    await desktop.close(); desktop = null; page = await boot();
+    assert.equal(modelRequests,before,'Restart must adopt existing verified Voice weights without network access.');
+    assert.equal(await familyStore.verify({...speechAsset('base.en'),kind:'asr'}),true);
+    assert.equal((await page.evaluate(()=>window.matiqVoice.status())).sharedModels.length,3); await expect(page.locator('#setup-dialog')).not.toBeVisible();
     assert.equal((await page.evaluate(() => window.matiqVoice.status())).connections.google.connected, true);
     assert.deepEqual((await page.evaluate(() => window.matiqVoice.status())).settings.bindings, {toggle:['MetaRight'],hold:['AltRight']});
     await page.getByRole('button', {name: 'Meetings', exact: true}).click(); await page.locator('.meeting-item').filter({hasText: 'English speaker E2E'}).click(); await expect(page.locator('#speaker-remote-0')).toHaveValue('Alex');
@@ -270,6 +309,18 @@ try {
 } finally {
   if (desktop) await desktop.close().catch(() => {});
   if (browser) await browser.close();
+  if (browserServer) await browserServer.close();
   if (server) { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
+  for(const owned of ownedDesktops) await lifecycle.verifyStopped(owned);
+  await lifecycle.verifyStopped(ownedBrowser);
+  if(fixturePort) {
+    const net=require('node:net');
+    await new Promise((resolve,reject)=>{const socket=net.connect(fixturePort,'127.0.0.1');socket.setTimeout(1000);socket.once('connect',()=>{socket.destroy();reject(new Error('The owned HTTP fixture port remains occupied. Inspect ownership before continuing.'));});socket.once('error',error=>{socket.destroy();if(error.code==='ECONNREFUSED')resolve();else reject(error);});socket.once('timeout',()=>{socket.destroy();reject(new Error('Cannot verify fixture port cleanup.'));});});
+  }
+  clearTimeout(watchdog);
   await fs.rm(temporary, {recursive: true, force: true});
+}
+
+if (!process.exitCode) {
+  await fs.writeFile(path.join(fixtures,'shared-models-results.json'),JSON.stringify({result:'passed',platform:process.platform,arch:process.arch,companionSource:'2a31fe6d3bc0afec6fe641ed5e53713a87c9edcc',sharedRootMatches:true,verifiedAssets:familyAssets.map(({file,sha256,bytes})=>({file,sha256,bytes})),offlineReuse:true,startupAdoption:true,nativeSpeechAndSpeakerInference:true},null,2));
 }

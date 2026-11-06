@@ -316,3 +316,13 @@ and the operator-assisted installed upgrade checks have passed.
 - A third-party outbound firewall initially blocked GitHub requests on one
   device. Endpoint-only, process-lifetime allowances permitted the in-app
   download; no blanket or permanent firewall allowance was introduced.
+
+## Family model integration
+
+The native E2E suite checks Voice against Companion's released model-store
+implementation (source `2a31fe6d3bc0afec6fe641ed5e53713a87c9edcc`). Set
+`MATIQ_COMPANION_SOURCE` to that checkout when running `npm run test:e2e`.
+The suite verifies actual speech and speaker weights, hard-link reuse by a second
+profile, typed Companion inventory, and offline adoption on restart, followed by
+real Whisper and ONNX inference. CI retains `shared-models-results.json` only after
+the complete journey passes. Unit tests alone do not establish this qualification.

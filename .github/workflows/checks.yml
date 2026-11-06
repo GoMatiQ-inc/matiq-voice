@@ -48,7 +48,14 @@ jobs:
           [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD 'scripts/verify-windows-signing.ps1'), [ref]$tokens, [ref]$errors) | Out-Null
           if ($errors.Count) { throw ($errors | Out-String) }
       - run: npm run engine:build
+      - uses: actions/checkout@v4
+        with:
+          repository: GoMatiQ-inc/matiq-companion
+          ref: 2a31fe6d3bc0afec6fe641ed5e53713a87c9edcc
+          path: family-companion
       - run: npm run test:e2e
+        env:
+          MATIQ_COMPANION_SOURCE: ${{ github.workspace }}/family-companion
       - name: Verify native Windows caret insertion
         if: runner.os == 'Windows'
         run: npm run test:focus
@@ -64,6 +71,7 @@ jobs:
         with:
           name: MatiQ-Voice-${{ runner.os }}-${{ runner.arch }}
           retention-days: 7
+          include-hidden-files: true
           path: |
             dist/*.pkg
             dist/*.dmg
@@ -73,6 +81,7 @@ jobs:
             .validation/matiq-voice-e2e.png
             .validation/e2e-failure.png
             .validation/e2e-results.json
+            .validation/shared-models-results.json
             .validation/packaged-results.json
           if-no-files-found: error
       - name: Retain tested preview installers
