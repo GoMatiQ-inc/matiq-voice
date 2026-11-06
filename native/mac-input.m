@@ -25,8 +25,22 @@ int main(int argc, const char *argv[]) {
                 fprintf(stderr, "Enable MatiQ Voice in Privacy & Security > Accessibility. Use Copy until permission is granted.\n"); return 77;
             }
             AXUIElementRef system = AXUIElementCreateSystemWide();
+            pid_t requestedPid = NSWorkspace.sharedWorkspace.frontmostApplication.processIdentifier;
+            AXUIElementRef application = AXUIElementCreateApplication(requestedPid);
+            // Electron exposes its renderer tree on request; native apps may not support this attribute.
+            AXUIElementSetAttributeValue(application, CFSTR("AXManualAccessibility"), kCFBooleanTrue);
+            CFRelease(application);
             CFTypeRef original = NULL;
-            if (focusedElement(system, &original) != kAXErrorSuccess || !original) {
+            // Electron debounces this request for two seconds; allow its tree to initialize.
+            for (int attempt = 0; attempt < 300; attempt++) {
+                if (NSWorkspace.sharedWorkspace.frontmostApplication.processIdentifier != requestedPid) break;
+                pid_t focusedPid = 0;
+                if (focusedElement(system, &original) == kAXErrorSuccess && original &&
+                    AXUIElementGetPid((AXUIElementRef)original, &focusedPid) == kAXErrorSuccess && focusedPid == requestedPid) break;
+                if (original) { CFRelease(original); original = NULL; }
+                usleep(10000);
+            }
+            if (!original) {
                 CFRelease(system); fprintf(stderr, "The focused text field is unavailable. Use Copy.\n"); return 78;
             }
             CFTypeRef role = NULL, subrole = NULL;

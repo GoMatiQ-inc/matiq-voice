@@ -316,3 +316,18 @@ and the operator-assisted installed upgrade checks have passed.
 - A third-party outbound firewall initially blocked GitHub requests on one
   device. Endpoint-only, process-lifetime allowances permitted the in-app
   download; no blanket or permanent firewall allowance was introduced.
+
+## Cold-editor automatic paste (2026-11-06)
+
+- The previous Mac focus fixture forced renderer accessibility on. Removing
+  that override reproduced a focused-field capture failure in a normal
+  Electron editor. The native helper now requests AXManualAccessibility and
+  waits up to three seconds for the editor's delayed accessibility tree,
+  rejecting a foreground-app change during initialization.
+- Three consecutive native Mac runs pass cold-editor capture, actual rich-text
+  insertion, delayed paste with a separate nonactivating overlay, Unicode,
+  beginning/middle/end insertion, preserved highlighted text, Undo, and rejection
+  after cursor/field changes. All 52 Node tests pass on Linux.
+- No dictation text or editor contents are logged. Existing permission grants
+  are still required. The installed user's destination app and signed update
+  have not yet been qualified with this change.
