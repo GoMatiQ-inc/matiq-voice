@@ -32,7 +32,7 @@ separate permission. This is **source available**, not OSI open source.
 
 ## Download and install
 
-The Mac download is **v0.3.8**, signed with MatiQ's Developer ID and
+The Mac download is **v0.3.10**, signed with MatiQ's Developer ID and
 Apple-notarized. Its app, native engines and installer passed signature,
 stapling and Gatekeeper checks, including verification of the updater ZIP. It
 includes the approved MatiQ Solutions wordmark, background update downloads,
@@ -45,7 +45,7 @@ and wider hardware testing remain unfinished. See
 
 | Computer | Download | Minimum OS |
 |---|---|---|
-| Apple Silicon Mac: M1, M2, M3, M4 or newer | [Mac installer (.pkg)](https://github.com/GoMatiQ-inc/matiq-voice/releases/download/v0.3.8/MatiQ-Voice-0.3.8-mac-arm64.pkg) | macOS 14.2 |
+| Apple Silicon Mac: M1, M2, M3, M4 or newer | [Mac installer (.pkg)](https://github.com/GoMatiQ-inc/matiq-voice/releases/download/v0.3.10/MatiQ-Voice-0.3.10-mac-arm64.pkg) | macOS 14.2 |
 | Windows PC: Intel/AMD 64-bit | [Windows installer (.exe)](https://github.com/GoMatiQ-inc/matiq-voice/releases/download/v0.3.4-preview.1/MatiQ-Voice-0.3.4-preview.1-windows-x64.exe) | Windows 10 |
 
 Intel Mac and native Windows ARM installers are not included in this preview.
