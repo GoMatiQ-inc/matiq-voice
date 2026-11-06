@@ -365,7 +365,7 @@ app process plus two captured inspector listeners are independently absent.
 Cold editor activation/overlay cases run only on Mac; Windows retains its
 established renderer accessibility setup and native caret insertion checks.
 
-## Background recording clock (0.3.11 candidate)
+## Background recording clock (0.3.11)
 
 A native Mac reproduction entered recording but stayed at 0:00 after Chromium
 reported an output-device error and suspended its AudioContext. Capture now uses
@@ -381,3 +381,18 @@ timer with the fix. Test input is synthetic; this does not by itself qualify
 physical microphone routing or the installed app. Owned fixture processes and
 captured inspector listeners are independently absent after exit. The capture
 check runs in both native CI jobs; the older full E2E autoplay override is removed.
+
+Both native platform jobs passed on merged source
+`6e3c2088c59ae1491d533aec95bfc5f73ac19e1e` in run 42312107025:
+55 unit tests, the three capture scenarios, 18 complete app journeys, packaging
+and packaged inference. The protected Mac job also passed Developer ID signing,
+Apple notarization, stapling, Gatekeeper and signed packaged-app checks.
+Run 42313488254 published the verified 0.3.11 PKG and in-app update assets.
+
+The verified signed PKG was installed on a Mac mini and MacBook Pro. Both show
+0.3.11, retain their existing custom bindings and active background keyboard
+access, and report up to date. Physical microphone checks reached Listening
+and advanced beyond zero on both; tests were cancelled without transcription
+or saving audio. Preferences/setup hashes and all three model files' hashes,
+byte counts and timestamps are unchanged. These checks establish installed
+capture-clock operation, not speech-content accuracy or direct Codex insertion.
