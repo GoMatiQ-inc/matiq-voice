@@ -279,5 +279,6 @@ The wordmark is byte-identical to `assets/logo/matiq-solutions-wordmark-dark@2x.
 in the canonical brand repository at commit
 `b8698a2e488370ec7aee0b134af86cb47bc6c0f2` (brand PR 44).
 Version 0.3.8 advances the version for installed upgrade qualification from the
-0.3.7 signed bridge; app behavior is unchanged. Signed bridge/target verification
+0.3.7 signed bridge. After explicit restart consent, Windows uses silent update
+installation rather than repeating the setup wizard. Mac update behavior is unchanged. Signed bridge/target verification
 and the installed upgrade result remain pending until recorded below.

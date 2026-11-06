@@ -38,7 +38,7 @@ function createUpdates({updater, enabled, isIdle, emit}) {
     if (!isIdle()) throw new Error('Finish dictation, meeting recording and transcription before restarting to update.');
     installing = true;
     publish({phase: 'installing', message: 'Verifying the update and restarting MatiQ Voice…'});
-    try { updater.quitAndInstall(false, true); }
+    try { updater.quitAndInstall(true, true); }
     catch (error) { installing = false; downloaded = false; fail(error); throw error; }
   }
   return {check, install, get installing() { return installing; }, get status() { return {...status}; }, dispose() { for (const [name, fn] of listeners) updater.removeListener(name, fn); }};
