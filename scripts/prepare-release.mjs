@@ -2,15 +2,18 @@ import {readFile, readdir, writeFile, stat} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {verifyUpdateAssets} from './verify-update-assets.mjs';
 
 export async function prepareRelease({version, tag, directory, signed = false}) {
   const preview = /^\d+\.\d+\.\d+-preview\.\d+$/.test(version);
   if (tag !== `v${version}` || (!preview && (!signed || !/^\d+\.\d+\.\d+$/.test(version)))) throw new Error('Release tag must match package.json. Stable releases require verified signed packages; unsigned preview tags use vX.Y.Z-preview.N.');
   const names = [`MatiQ-Voice-${version}-mac-arm64.pkg`, `MatiQ-Voice-${version}-windows-x64.exe`];
   const reports = signed ? ['mac-signature.json', 'windows-signature.json'] : [];
-  const expected = [...names, ...reports];
+  const updates = signed ? [`MatiQ-Voice-${version}-mac-arm64.zip`, 'latest-mac.yml', 'latest.yml'] : [];
+  const optional = signed ? [`MatiQ-Voice-${version}-mac-arm64.zip.blockmap`, `MatiQ-Voice-${version}-windows-x64.exe.blockmap`] : [];
+  const expected = [...names, ...reports, ...updates];
   const files = await readdir(directory);
-  if (files.length !== expected.length || files.some(file => !expected.includes(file))) throw new Error('Provide exactly the tested Mac arm64 PKG and Windows x64 EXE, plus native verification reports for signed releases. Do not publish debug profiles, logs or other files.');
+  if (expected.some(file => !files.includes(file)) || files.some(file => !expected.includes(file) && !optional.includes(file))) throw new Error('Provide exactly the tested Mac arm64 PKG and Windows x64 EXE, plus native verification reports for signed releases. Do not publish debug profiles, logs or other files.');
   const checksums = [];
   for (const name of names) {
     const filename = path.join(directory, name), metadata = await stat(filename);
@@ -22,6 +25,16 @@ export async function prepareRelease({version, tag, directory, signed = false}) 
       if (proof.version !== version || proof.artifact !== name || proof.sha256 !== digest || proof.signed !== true || proof.platform !== (mac ? 'darwin' : 'win32') || (mac ? proof.notarized !== true || proof.stapled !== true || !proof.team : proof.timestamped !== true || !proof.publisher)) throw new Error(`Signed release verification does not cover ${name}. Re-run native signature verification; do not reuse stale reports.`);
     }
     checksums.push(`${digest}  ${name}`);
+  }
+  if (signed) {
+    await verifyUpdateAssets(directory, version, 'darwin');
+    await verifyUpdateAssets(directory, version, 'win32');
+    const macProof = JSON.parse(await readFile(path.join(directory, 'mac-signature.json'), 'utf8'));
+    for (const name of [...updates, ...files.filter(file => optional.includes(file))]) {
+      const digest = createHash('sha256').update(await readFile(path.join(directory, name))).digest('hex');
+      if ((name.includes('-mac-') || name === 'latest-mac.yml') && macProof.assets?.[name] !== digest) throw new Error(`Signed release verification does not cover ${name}.`);
+      checksums.push(`${digest}  ${name}`);
+    }
   }
   await writeFile(path.join(directory, 'SHA256SUMS.txt'), checksums.join('\n') + '\n');
   await writeFile(path.join(directory, 'RELEASE_NOTES.md'), `# MatiQ Voice ${version}${preview ? ' — preview' : ''}
@@ -43,7 +56,7 @@ Unit tests, E2E, packaging and packaged native inference pass on both build plat
 
 Free for personal and internal business use under the [MatiQ Voice No-Sale License](https://github.com/GoMatiQ-inc/matiq-voice/blob/${tag}/LICENSE). Preserve attribution. Paid access, hosting and paid bundles require separate permission. Third-party licenses remain intact.
 `);
-  return names;
+  return [...names, ...updates, ...files.filter(file => optional.includes(file))];
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

@@ -41,7 +41,17 @@ test('release refuses empty installer placeholders', () => fixture(async (direct
 
 async function proofs(directory, names) {
   const digest = createHash('sha256').update(Buffer.alloc(1024 * 1024, 7)).digest('hex');
-  for (const [index, name] of names.entries()) await fs.writeFile(path.join(directory, index === 0 ? 'mac-signature.json' : 'windows-signature.json'), JSON.stringify({platform: index === 0 ? 'darwin' : 'win32', version: '0.3.4', artifact: name, sha256: digest, signed: true, notarized: true, stapled: true, team: 'TESTTEAM01', timestamped: true, publisher: 'Fixture Publisher'}));
+  const yaml = require('js-yaml');
+  const zip = names[0].replace('.pkg','.zip');
+  await fs.writeFile(path.join(directory,zip),Buffer.alloc(1024*1024,7));
+  const updateAssets = {};
+  for (const [name, metadata] of [[zip,'latest-mac.yml'],[names[1],'latest.yml']]) {
+    const bytes=await fs.readFile(path.join(directory,name));
+    await fs.writeFile(path.join(directory,metadata),yaml.dump({version:'0.3.4',files:[{url:name,sha512:createHash('sha512').update(bytes).digest('base64'),size:bytes.length}]}));
+    updateAssets[name]=createHash('sha256').update(bytes).digest('hex');
+    updateAssets[metadata]=createHash('sha256').update(await fs.readFile(path.join(directory,metadata))).digest('hex');
+  }
+  for (const [index, name] of names.entries()) await fs.writeFile(path.join(directory, index === 0 ? 'mac-signature.json' : 'windows-signature.json'), JSON.stringify({platform: index === 0 ? 'darwin' : 'win32', version: '0.3.4', assets:updateAssets, artifact: name, sha256: digest, signed: true, notarized: true, stapled: true, team: 'TESTTEAM01', timestamped: true, publisher: 'Fixture Publisher'}));
 }
 test('stable release accepts matching native signature and notarization reports', () => fixture(async (directory, names, prepareRelease) => {
   await proofs(directory, names);
@@ -57,3 +67,9 @@ test('stable release refuses missing Apple notarization evidence', () => fixture
   const proof = JSON.parse(await fs.readFile(file, 'utf8')); proof.notarized = false; await fs.writeFile(file, JSON.stringify(proof));
   await assert.rejects(prepareRelease({version:'0.3.4', tag:'v0.3.4', directory, signed:true}), /does not cover/);
 }, '0.3.4'));
+
+test('stable release refuses update ZIP bytes or metadata not covered by verification', () => fixture(async (directory, names, prepareRelease) => {
+  await proofs(directory,names);
+  await fs.writeFile(path.join(directory,names[0].replace('.pkg','.zip')),Buffer.alloc(1024*1024,9));
+  await assert.rejects(prepareRelease({version:'0.3.4',tag:'v0.3.4',directory,signed:true}),/checksum does not match/);
+},'0.3.4'));

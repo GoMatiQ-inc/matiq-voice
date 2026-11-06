@@ -29,7 +29,7 @@ async function boot() {
   const entry = path.join(temporary, 'bootstrap.cjs');
   const base = `http://127.0.0.1:${server.address().port}`;
   const endpoints = Object.fromEntries(['microsoft', 'google'].map(id => [id, Object.fromEntries(['authorize', 'token', 'profile', 'events', 'revoke'].map(key => [key, `${base}/${id}/${key}`]))]));
-  await fs.writeFile(entry, `const {app}=require('electron');const fs=require('node:fs/promises');app.setPath('userData',${JSON.stringify(profile)});require(${JSON.stringify(path.join(root, 'src/main.cjs'))}).launch({keyboardSpawn:()=>{const child=new(require('node:events').EventEmitter)();const Stream=require('node:stream').PassThrough;child.stdout=new Stream();child.stderr=new Stream();child.stdin=new Stream();child.kill=()=>child.emit('close',0);globalThis.__keyboardFixture=child;queueMicrotask(()=>child.stdout.write(JSON.stringify({ready:true})+'\\n'));return child;},oauthConfig:{microsoft:{clientId:'fixture-microsoft'},google:{clientId:'fixture-google'}},testEndpoints:${JSON.stringify(endpoints)},openBrowser:async url=>fs.writeFile(${JSON.stringify(authorizeFile)},url),inspectHardware:async(directory,engine)=>{const h=await require(${JSON.stringify(path.join(root, 'src/hardware.cjs'))}).inspectHardware(directory,engine);const recommend=require(${JSON.stringify(path.join(root, 'src/hardware.cjs'))}).recommendModel;return {...h,memoryBytes:4*1024**3,cores:2,recommendation:recommend({platform:process.platform,arch:process.arch,memoryBytes:4*1024**3,cores:2})};},downloadAsset:async(asset,...rest)=>require(${JSON.stringify(path.join(root, 'src/assets.cjs'))}).downloadAsset({...asset,url:${JSON.stringify(base)}+'/models/'+asset.file},...rest)});`);
+  await fs.writeFile(entry, `const {app}=require('electron');const fs=require('node:fs/promises');app.setPath('userData',${JSON.stringify(profile)});require(${JSON.stringify(path.join(root, 'src/main.cjs'))}).launch({updater:(()=>{const u=new(require('node:events').EventEmitter)();u.setFeedURL=()=>{};u.checkForUpdates=async()=>({cancellationToken:{},updateInfo:{version:'99.0.0'}});u.downloadUpdate=async()=>u.emit('update-downloaded',{version:'99.0.0'});u.quitAndInstall=()=>{globalThis.__updateInstalled=true;setTimeout(()=>{const {autoUpdater,BrowserWindow}=require('electron');autoUpdater.emit('before-quit-for-update');BrowserWindow.getAllWindows().find(w=>w.getTitle()==='MatiQ Voice').close();},100);};return u;})(),keyboardSpawn:()=>{const child=new(require('node:events').EventEmitter)();const Stream=require('node:stream').PassThrough;child.stdout=new Stream();child.stderr=new Stream();child.stdin=new Stream();child.kill=()=>child.emit('close',0);globalThis.__keyboardFixture=child;queueMicrotask(()=>child.stdout.write(JSON.stringify({ready:true})+'\\n'));return child;},oauthConfig:{microsoft:{clientId:'fixture-microsoft'},google:{clientId:'fixture-google'}},testEndpoints:${JSON.stringify(endpoints)},openBrowser:async url=>fs.writeFile(${JSON.stringify(authorizeFile)},url),inspectHardware:async(directory,engine)=>{const h=await require(${JSON.stringify(path.join(root, 'src/hardware.cjs'))}).inspectHardware(directory,engine);const recommend=require(${JSON.stringify(path.join(root, 'src/hardware.cjs'))}).recommendModel;return {...h,memoryBytes:4*1024**3,cores:2,recommendation:recommend({platform:process.platform,arch:process.arch,memoryBytes:4*1024**3,cores:2})};},downloadAsset:async(asset,...rest)=>require(${JSON.stringify(path.join(root, 'src/assets.cjs'))}).downloadAsset({...asset,url:${JSON.stringify(base)}+'/models/'+asset.file},...rest)});`);
   desktop = await electron.launch({executablePath: require('electron'), cwd: root, args: [entry, '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--autoplay-policy=no-user-gesture-required']});
   await expect.poll(() => desktop.windows().some(page => page.url().endsWith('/index.html')), {timeout: 15000}).toBe(true);
   const page = desktop.windows().find(value => value.url().endsWith('/index.html'));
@@ -186,6 +186,22 @@ try {
     await keys([['MetaRight',true],['MetaRight',true],['MetaRight',false]]);await expect.poll(async()=>(await page.evaluate(()=>window.matiqVoice.status())).state,{timeout:60000}).toBe('idle');
     await desktop.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows().find(win=>win.getTitle()==='MatiQ Voice').show());
   });
+  await scenario('approved Solutions wordmark keeps Voice label and updater cannot restart during recording',async()=>{
+    await page.getByRole('button',{name:'Settings',exact:true}).click();
+    await expect(page.locator('.brand img')).toHaveAttribute('alt','MatiQ Solutions');
+    await expect(page.locator('.brand span')).toHaveText('Voice');
+    assert.equal(await page.locator('.brand img').evaluate(img=>img.complete && img.naturalWidth===1374),true);
+    if (!(await page.locator('#update-install').isVisible())) await page.locator('#update-check').click();
+    await expect(page.locator('#update-install')).toBeVisible();
+    await page.evaluate(async()=>{await window.matiqVoice.begin();await window.matiqVoice.recordingReady();});
+    await expect(page.locator('#update-install')).toBeDisabled();
+    const rejection=await page.evaluate(()=>window.matiqVoice.installUpdate().then(()=>'',error=>error.message));
+    assert.match(rejection,/Finish dictation/);
+    assert.equal(await desktop.evaluate(()=>Boolean(globalThis.__updateInstalled)),false);
+    await page.evaluate(()=>window.matiqVoice.cancel());
+    await expect(page.locator('#update-install')).toBeEnabled();
+    await page.getByRole('button',{name:'Dictation',exact:true}).click();
+  });
   await scenario('quick push-to-talk release during microphone startup never leaves recording running',async()=>{
     await page.evaluate(()=>{const original=navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);window.__restoreMicrophone=()=>{navigator.mediaDevices.getUserMedia=original;};navigator.mediaDevices.getUserMedia=async options=>{await new Promise(resolve=>setTimeout(resolve,400));return original(options);};});
     await keys([['AltRight',true],['AltRight',false]]);
@@ -237,6 +253,13 @@ try {
   });
   await scenario('disconnect removes protected local credentials', async () => {
     await page.getByRole('button', {name: 'Settings', exact: true}).click(); await page.locator('#connections button[data-provider="google"]').click(); await expect.poll(async () => (await page.evaluate(() => window.matiqVoice.status())).connections.google.connected).toBe(false); await assert.rejects(fs.access(path.join(profile, 'credentials', 'google.bin')));
+  });
+  await scenario('explicit update restart closes the window instead of hiding in the tray',async()=>{
+    await page.evaluate(()=>window.matiqVoice.checkUpdates());
+    await expect(page.locator('#update-install')).toBeEnabled();
+    await page.evaluate(()=>window.matiqVoice.installUpdate());
+    await expect.poll(()=>desktop.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows().some(win=>win.getTitle()==='MatiQ Voice'))).toBe(false);
+    assert.equal(await desktop.evaluate(()=>globalThis.__updateInstalled),true);
   });
   assert.deepEqual(pageErrors, []);
   await fs.writeFile(path.join(fixtures, 'e2e-results.json'), JSON.stringify({result: 'passed', journeys: results, providers: 'Local fixtures', audio: 'Synthetic capture plus real English inference fixtures'}, null, 2));
