@@ -326,3 +326,10 @@ The suite verifies actual speech and speaker weights, hard-link reuse by a secon
 profile, typed Companion inventory, and offline adoption on restart, followed by
 real Whisper and ONNX inference. CI retains `shared-models-results.json` only after
 the complete journey passes. Unit tests alone do not establish this qualification.
+
+The completion bridge at `6824dd46fab4c221118ee7a3b760b43d6ef3fda4` passed
+both native platform jobs in run 42247599594: 55 unit tests, 18 E2E journeys,
+real Whisper/ONNX inference, shared-cache adoption and second-profile reuse,
+Windows native caret insertion, packaging and packaged native inference.
+The 0.3.9 candidate adds explicit packaged cache/adoption assertions and owned
+process/port cleanup checks; those additions require their own CI result.

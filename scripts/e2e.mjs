@@ -19,7 +19,7 @@ const results = [], pageErrors = [], proof = new Map();
 if (!process.env.MATIQ_COMPANION_SOURCE) throw new Error('Set MATIQ_COMPANION_SOURCE to the qualified Companion checkout before running the family integration suite.');
 const companionRoot = path.resolve(process.env.MATIQ_COMPANION_SOURCE);
 const {ModelStore, sharedRoot: companionSharedRoot} = require(path.join(companionRoot,'src/models.cjs'));
-const lifecycle = require(path.join(companionRoot,'scripts/fixture-lifecycle.cjs'));
+const lifecycle = require('./fixture-lifecycle.cjs');
 const {sharedRoot, speechAsset, adoptExistingAssets} = require('../src/shared-models.cjs');
 const {SPEAKER_MODELS} = require('../src/assets.cjs');
 const familyRoot = path.join(temporary,'family-models'), familyStore = new ModelStore(familyRoot);
