@@ -25,6 +25,7 @@ async function start(options) {
   const requests=new Set();
   const listeners = [];
   const ownedChildren = new Set();
+  const trackChild=child=>{ownedChildren.add(watch(child));child.once("exit",()=>ownedChildren.delete(child));child.once("close",()=>ownedChildren.delete(child));return child;};
   const listen = (emitter,event,fn) => {emitter.on(event,fn);listeners.push([emitter,event,fn]);};
   await app.whenReady();
   if(!host)lease=await require("@matiq-solutions/runtime/tool-lease.cjs").acquireToolLease({root:path.join(app.getPath("appData"),"MatiQ Solutions","tool-locks"),id:"com.matiq.voice",owner:app.getName()});
@@ -61,13 +62,14 @@ async function start(options) {
   const win = host?.window || new BrowserWindow({width: 1120, height: 820, minWidth: 840, minHeight: 640, title: 'MatiQ Voice', backgroundColor: '#ffffff', show: false,
     webPreferences: {preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false}});
   const workspace = host?.view.webContents || win.webContents;
+  const requireFrame=host?null:require("@matiq-solutions/runtime/trusted-frame.cjs").frameGuard(workspace,path.join(__dirname,"ui/index.html"));
   const hud = new BrowserWindow({width: 248, height: 60, frame: false, transparent: true, hasShadow: false, resizable: false, focusable: false, alwaysOnTop: true, skipTaskbar: true, show: false,
     webPreferences: {preload: path.join(__dirname, 'hud-preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false}});
   win.setMenuBarVisibility(false); hud.setVisibleOnAllWorkspaces(true, {visibleOnFullScreen: true, skipTransformProcessType: true});
   const send = message => { if (!win.isDestroyed()) workspace.send('app-event', message); };
   const notice = message => send({type: 'notice', message});
   const nativeDir = host ? path.join(host.resourceDir,'native') : app.isPackaged ? path.join(process.resourcesPath, 'native') : path.join(__dirname, '..', 'native');
-  const keyboard = new Keyboard({engineDir, nativeDir, ...(options.keyboardSpawn ? {spawnProcess: options.keyboardSpawn} : {}), bindings: settings.bindings, emit: event => {
+  const keyboard = new Keyboard({engineDir, nativeDir, spawnProcess:(...args)=>trackChild((options.keyboardSpawn||require("node:child_process").spawn)(...args)), bindings: settings.bindings, emit: event => {
     if (event.type === 'keyboard-status') shortcutReady = event.ready;
     send(event);
   }});
@@ -167,7 +169,7 @@ async function start(options) {
       try{return await request;}finally{requests.delete(request);}
     };
     if(host){host.handle(channel,invoke);return;}
-    ipcMain.handle(channel, (event,...args)=>{if(event.sender!==workspace||!isOwnFrame(event.senderFrame))throw Error('Untrusted application frame.');return invoke(...args);});
+    ipcMain.handle(channel, async(event,...args)=>{await requireFrame(event);return invoke(...args);});
   }
   listen(ipcMain,'hud-action', (event, action) => { if (event.sender !== hud.webContents || event.senderFrame?.url !== hudURL) return; if (action === 'stop') send({type: activeMeeting ? 'stop-meeting' : 'toggle'}); if (action === 'cancel' && !activeMeeting) send({type: 'cancel'}); });
   handle('meter', ({level, seconds}) => { if (!Number.isFinite(level) || !Number.isFinite(seconds)) return; hud.webContents.send('hud-meter', {level: Math.min(1, Math.max(0, level)), seconds: Math.max(0, seconds)}); });
@@ -185,9 +187,9 @@ async function start(options) {
     catch(error) {return {microphone,accessibility:false,pasteError:`Could not check native paste access: ${error.message}`};}
   }
   async function input() {
-    if (process.platform === 'darwin') return captureTarget(path.join(engineDir, 'mac-input'), ['session']);
+    if (process.platform === 'darwin') return captureTarget(path.join(engineDir, 'mac-input'), ['session'],{onSpawn:trackChild});
     const script = path.join(nativeDir,'windows-input.ps1');
-    return captureTarget('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', script, '-Action', 'session']);
+    return captureTarget('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', script, '-Action', 'session'],{onSpawn:trackChild});
   }
   async function recognize() {
     const controller = new AbortController(); operation = controller; setState('processing');
@@ -319,7 +321,7 @@ async function start(options) {
     meeting.status = 'processing'; meeting.error = ''; await meetings.write(meeting); activeMeeting = id; setState('meeting-processing');
     try {
       const result = await new Promise((resolve, reject) => {
-        worker = utilityProcess.fork(path.join(__dirname, 'meeting-worker.cjs'), [], {serviceName: 'MatiQ Voice local meeting processing', stdio: 'pipe'});
+        worker = trackChild(utilityProcess.fork(path.join(__dirname, 'meeting-worker.cjs'), [], {serviceName: 'MatiQ Voice local meeting processing', stdio: 'pipe'}));
         worker.once('message', message => message.ok ? resolve(message.result) : reject(new Error(message.error)));
         worker.once('exit', code => reject(new Error(`Meeting worker stopped (${code}). Audio is retained; retry processing.`)));
         worker.once('spawn', () => worker.postMessage({directory: meetings.folder(id), binary, model: path.join(modelDir, `ggml-${settings.model}.bin`), models: modelDir}));
