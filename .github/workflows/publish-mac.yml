@@ -46,12 +46,23 @@ jobs:
           gh('run', 'download', run_id, '--repo', repo, '--name', 'signed-installers-macOS-ARM64', '--dir', 'release-assets')
           folder = pathlib.Path('release-assets')
           name = f'MatiQ-Voice-{version}-mac-arm64.pkg'
-          assert {p.name for p in folder.iterdir()} == {name, 'mac-signature.json'}, 'Expected exactly the signed PKG and its verification report.'
+          zip_name = f'MatiQ-Voice-{version}-mac-arm64.zip'
+          assets = {name, zip_name, 'latest-mac.yml'}
+          optional = {zip_name + '.blockmap'}
+          present = {p.name for p in folder.iterdir()}
+          assert assets | {'mac-signature.json'} <= present and present <= assets | optional | {'mac-signature.json'}, 'Require only the verified installer, update ZIP, metadata and optional blockmap.'
           digest = hashlib.sha256((folder/name).read_bytes()).hexdigest()
           proof = json.loads((folder/'mac-signature.json').read_text())
           assert proof['version'] == version and proof['artifact'] == name and proof['sha256'] == digest, 'Verification report must cover these exact installer bytes.'
           assert proof['platform'] == 'darwin' and all(proof.get(k) is True for k in ['signed', 'notarized', 'stapled']) and proof.get('team'), 'Require Developer ID signatures and Apple notarization/stapling.'
-          (folder/'SHA256SUMS.txt').write_text(f'{digest}  {name}\n')
+          published = sorted(present - {'mac-signature.json'})
+          assert set(proof.get('assets', {})) == set(published), 'Signature report must cover every update asset.'
+          checksums = []
+          for asset in published:
+              digest = hashlib.sha256((folder/asset).read_bytes()).hexdigest()
+              assert proof['assets'][asset] == digest, f'Verification report does not cover {asset} bytes.'
+              checksums.append(f'{digest}  {asset}')
+          (folder/'SHA256SUMS.txt').write_text('\n'.join(checksums) + '\n')
           notes = f"""MatiQ Voice {version} — signed Apple Silicon Mac installer
 
           Free local English dictation and meeting notes by [MatiQ Inc](https://matiqinc.com).
@@ -60,7 +71,9 @@ jobs:
 
           The app, native engines and installer passed Developer ID signature verification, Apple notarization, stapling and Gatekeeper assessment. Packaged local transcription and both platform test jobs passed. [Verified build]({run['html_url']}); source commit `{sha}`.
 
-          Quit MatiQ Voice before upgrading. Open the PKG to install in Applications, then follow setup for local models, Microphone, Accessibility and keyboard access. Normal administrator and privacy permission prompts still apply. No compiler or developer account is required.
+          This release includes automatic update checks, background downloads and an explicit Restart to update action that waits until audio work is finished. The ZIP and latest-mac.yml are the verified in-app update assets. Older versions without the updater need this PKG once.
+
+          Quit MatiQ Voice before installing the PKG. Open the PKG to install in Applications, then follow setup for local models, Microphone, Accessibility and keyboard access. Normal administrator and privacy permission prompts still apply. No compiler or developer account is required.
 
           **Windows signing is awaiting Microsoft company verification.** This release contains only the verified Mac installer; the older Windows preview remains unsigned.
 
@@ -74,6 +87,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$RELEASE_TAG" release-assets/*.pkg release-assets/SHA256SUMS.txt \
+          shopt -s nullglob
+          gh release create "$RELEASE_TAG" release-assets/*.pkg release-assets/*.zip release-assets/*.blockmap release-assets/latest-mac.yml release-assets/SHA256SUMS.txt \
             --target "$SOURCE_SHA" --title "MatiQ Voice $RELEASE_TAG — signed Mac installer" \
             --notes-file release-assets/RELEASE_NOTES.md --latest

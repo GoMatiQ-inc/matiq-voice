@@ -1,7 +1,7 @@
 {
   "name": "matiq-voice",
   "productName": "MatiQ Voice",
-  "version": "0.3.6",
+  "version": "0.3.7",
   "private": true,
   "description": "Private English dictation and meeting notes by MatiQ.",
   "author": "MatiQ Inc",
@@ -24,6 +24,7 @@
   "devDependencies": {
     "electron": "45.0.0",
     "electron-builder": "26.15.3",
+    "js-yaml": "4.3.2",
     "playwright": "1.64.1"
   },
   "build": {
@@ -106,6 +107,7 @@
     }
   },
   "dependencies": {
+    "electron-updater": "6.8.9",
     "sherpa-onnx-node": "2.0.0"
   },
   "license": "SEE LICENSE IN LICENSE"

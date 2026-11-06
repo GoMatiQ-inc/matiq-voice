@@ -9,6 +9,7 @@ test('Mac signing requires both public-distribution certificates and notarizatio
   assert.throws(() => signingConfig('darwin', {...mac, APPLE_APP_SPECIFIC_PASSWORD:''}, config), /notarization credentials/);
   const result = signingConfig('darwin', mac, config);
   assert.equal(result.mac.identity, 'Fixture (TESTTEAM01)'); assert.equal(result.pkg.identity, 'Fixture (TESTTEAM01)');
+  assert.equal(result.extraMetadata.matiqOfficialUpdates, true); assert.equal(result.publish[0].repo, 'matiq-voice');
   assert.equal(result.mac.notarize, true); assert.ok(result.mac.binaries.includes('Contents/Resources/engine/mac-keys'));
   assert.ok(!JSON.stringify(result).includes(mac.APPLE_APP_SPECIFIC_PASSWORD));
 });
@@ -18,6 +19,7 @@ test('Azure Windows signing rejects partial profiles and untrusted endpoints', (
   assert.throws(() => signingConfig('win32', {...env, MATIQ_AZURE_SIGN_ENDPOINT:'https://example.test'}, config), /official regional/);
   const result = signingConfig('win32', env, config); assert.deepEqual(result.win.signExts, ['.dll', '.node']);
   assert.equal(result.win.azureSignOptions.publisherName, 'Fixture Publisher');
+  assert.equal(result.win.publisherName, 'Fixture Publisher'); assert.equal(result.win.verifyUpdateCodeSignature,true);
 });
 test('signed releases fail without real provider configuration or supported signer', () => {
   assert.throws(() => signingConfig('darwin', mac, {}), /OAuth registrations/);

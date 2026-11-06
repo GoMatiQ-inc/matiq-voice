@@ -168,6 +168,9 @@ jobs:
             dist/*.pkg
             dist/*.exe
             dist/*-signature.json
+            dist/*.zip
+            dist/*.blockmap
+            dist/latest*.yml
           if-no-files-found: error
   release:
     if: always() && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && needs.desktop.result == 'success' && (contains(github.ref, '-preview.') || needs.signed.result == 'success')
@@ -190,6 +193,7 @@ jobs:
           pattern: ${{ contains(github.ref, '-preview.') && 'release-installers-*' || 'signed-installers-*' }}
           merge-multiple: true
           path: release-assets
+      - run: npm ci --ignore-scripts
       - name: Validate downloads and generate checksums and notes
         run: node scripts/prepare-release.mjs release-assets
         env:
@@ -201,8 +205,9 @@ jobs:
         run: |
           flags=()
           if [[ "$RELEASE_TAG" == *-preview.* ]]; then flags+=(--prerelease); fi
+          shopt -s nullglob
           gh release create "$RELEASE_TAG" \
-            release-assets/*.pkg release-assets/*.exe release-assets/SHA256SUMS.txt \
+            release-assets/*.pkg release-assets/*.exe release-assets/*.zip release-assets/*.yml release-assets/*.blockmap release-assets/SHA256SUMS.txt \
             --verify-tag "${flags[@]}" \
             --title "MatiQ Voice $RELEASE_TAG" \
             --notes-file release-assets/RELEASE_NOTES.md
