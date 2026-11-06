@@ -59,6 +59,28 @@ models over the internet; allow several GB of free space and keep the computer
 connected until verification finishes. After model installation, local dictation
 works offline. Optional calendar connections require internet access.
 
+### Automatic updates
+
+Official signed releases starting with 0.3.7 check for updates shortly after
+launch and every six hours, download them in the background, and offer
+**Settings → Updates → Restart to update**. You can also check from the menu-bar
+or system-tray menu. Restart is explicit and is blocked during dictation,
+meeting capture, model downloads and transcription. Closing the window keeps
+the app running; it does not install an update.
+
+Versions 0.3.6 and earlier need the update-enabled installer once. Updates
+preserve local models, preferences and meeting files. The app checks the
+package checksum and operating-system code signature before installation.
+Normal macOS administrator or privacy prompts may still apply. Update checks
+contact GitHub for release metadata and packages; they do not upload audio or
+transcripts. Offline use continues normally; failed updates appear in Settings
+and can be retried.
+
+Development builds and unsigned previews do not update automatically. Windows
+automatic updates require an official signed Windows release; Microsoft company
+verification is still pending. If you build a fork, configure your own release
+feed and signing identities rather than using MatiQ's official update channel.
+
 ### Mac installation
 
 1. Quit an existing MatiQ Voice from its menu-bar icon before upgrading.

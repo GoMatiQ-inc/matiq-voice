@@ -63,7 +63,7 @@ async function start(options) {
   if (process.platform === 'darwin') icon.setTemplateImage(true);
   const tray = new Tray(icon), show = () => { win.show(); win.focus(); };
   let updateTimer, updateInterval;
-  const updates = createUpdates({updater: app.isPackaged ? require('electron-updater').autoUpdater : null, enabled: app.isPackaged && require('../package.json').matiqOfficialUpdates === true, isIdle: () => state === 'idle' && !activeMeeting, emit: update => { send({type: 'updates', update}); updateTray(); }});
+  const updates = createUpdates({updater: options.updater || (app.isPackaged ? require('electron-updater').autoUpdater : null), enabled: Boolean(options.updater) || (app.isPackaged && require('../package.json').matiqOfficialUpdates === true), isIdle: () => state === 'idle' && !activeMeeting, emit: update => { send({type: 'updates', update}); updateTray(); }});
   function updateTray() {
     tray.setToolTip(`MatiQ Voice — ${state}`);
     if (process.platform === 'darwin') tray.setTitle(['recording', 'meeting-recording'].includes(state) ? '●' : ['processing', 'meeting-processing'].includes(state) ? '…' : '');

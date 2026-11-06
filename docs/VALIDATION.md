@@ -264,3 +264,15 @@ inferred from those fixture tests.
   pixels unchanged. Voice remains a separate text label and divider.
 - Header spacing accommodates the two-line mark at standard and narrow sidebar
   widths. All 46 Node tests pass. Native visual/E2E qualification is pending.
+
+## Automatic update implementation
+
+- 51 Node tests pass on the Linux development host, including idle-only install,
+  explicit restart, disabled unsigned builds, serialized checks, visible network
+  and checksum errors, and rejection of changed update ZIP bytes.
+- Native desktop CI now exercises the approved Solutions asset and updater IPC
+  during recording using a fixture updater. This is a lifecycle test, not an
+  actual installed signed upgrade. Results are pending.
+- Signed updater ZIP extraction, signature/notarization checks and a real
+  installed-app upgrade remain release qualification gates; no completed
+  upgrade is claimed here. Windows signing remains externally blocked.

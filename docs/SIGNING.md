@@ -83,3 +83,22 @@ matching signed/notarized/stapled report covering the exact PKG hash. It creates
 checksums. It fails if that release already exists, preserving published assets.
 Windows preview downloads remain explicitly unsigned. The ordinary combined
 release workflow continues to require verified signatures for both platforms.
+
+## In-app update packages
+
+Protected Mac builds produce a PKG and an updater ZIP containing the notarized,
+stapled app. Verification extracts that ZIP and repeats signature, team,
+stapling and Gatekeeper checks, then checks `latest-mac.yml` against the ZIP's
+SHA512 and size. The verification report records the SHA256 of every published
+asset. The Mac publisher rejects missing, changed or unrecognized files.
+
+Windows uses signed NSIS packages, `latest.yml`, and expected-publisher
+verification. Automatic updates are enabled only by the signed release build
+configuration. Unsigned previews do not advertise an update feed. Both
+platforms use the public GitHub release channel; no updater token or signing
+private key is bundled. The app never installs on quit or restarts automatically.
+
+To qualify an actual upgrade, install the first updater-enabled signed release,
+publish a newer qualified version, then check, download and restart from the
+installed app. Confirm its version and retained user data afterward. Mocked
+updater tests cover lifecycle behavior, not this installed signed upgrade.
