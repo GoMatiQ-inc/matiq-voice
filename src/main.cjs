@@ -10,6 +10,7 @@ const {EncryptedTokenStore, Connections, meetingURL} = require('./oauth.cjs');
 const {MeetingStore} = require('./meetings.cjs');
 const {captureTarget,readPasteAccess} = require('./input.cjs');
 const {Keyboard} = require('./keyboard.cjs');
+const {createUpdates} = require('./updates.cjs');
 
 function launch(options = {}) {
   app.setName('MatiQ Voice');
@@ -61,6 +62,8 @@ async function start(options) {
   const icon = nativeImage.createFromPath(path.join(__dirname, 'ui', 'tray.png'));
   if (process.platform === 'darwin') icon.setTemplateImage(true);
   const tray = new Tray(icon), show = () => { win.show(); win.focus(); };
+  let updateTimer, updateInterval;
+  const updates = createUpdates({updater: app.isPackaged ? require('electron-updater').autoUpdater : null, enabled: app.isPackaged && require('../package.json').matiqOfficialUpdates === true, isIdle: () => state === 'idle' && !activeMeeting, emit: update => { send({type: 'updates', update}); updateTray(); }});
   function updateTray() {
     tray.setToolTip(`MatiQ Voice — ${state}`);
     if (process.platform === 'darwin') tray.setTitle(['recording', 'meeting-recording'].includes(state) ? '●' : ['processing', 'meeting-processing'].includes(state) ? '…' : '');
@@ -70,6 +73,7 @@ async function start(options) {
       {label: activeMeeting ? 'Stop meeting recording' : 'Record meeting', enabled: state === 'idle' || state === 'meeting-recording', click: () => activeMeeting ? send({type: 'stop-meeting'}) : (show(), send({type: 'navigate', page: 'meetings'}))},
       {label: 'Copy last transcript', enabled: Boolean(lastTranscript), click: () => clipboard.writeText(lastTranscript)},
       {label: 'Settings', click: () => { show(); send({type: 'navigate', page: 'settings'}); }},
+      {label: updates.status.phase === 'ready' ? 'Restart to update' : 'Check for updates', enabled: updates.status.phase === 'ready' ? state === 'idle' : !['disabled', 'checking', 'downloading'].includes(updates.status.phase), click: () => { show(); send({type: 'navigate', page: 'settings'}); if (updates.status.phase === 'ready') { try { updates.install(); } catch (error) { notice(error.message); } } else updates.check(); }},
       {type: 'separator'}, {label: 'Quit MatiQ Voice', click: () => app.quit()}
     ]));
   }
@@ -108,7 +112,7 @@ async function start(options) {
     for (const provider of ['microsoft', 'google']) connections.cancel(provider);
     if (awake !== null) powerSaveBlocker.stop(awake);
   });
-  app.on('will-quit', () => { keyboard.stop(); globalShortcut.unregisterAll(); });
+  app.on('will-quit', () => { clearTimeout(updateTimer); clearInterval(updateInterval); updates.dispose(); keyboard.stop(); globalShortcut.unregisterAll(); });
   const isOwnFrame = frame => frame?.url === pageURL;
   session.defaultSession.setPermissionRequestHandler((contents, permission, callback, details) => {
     const own = contents === win.webContents && isOwnFrame(contents.mainFrame);
@@ -164,7 +168,9 @@ async function start(options) {
     } catch (error) { if (!controller.signal.aborted) { notice(`Recognition failed: ${error.message} Use Retry; your audio is retained in memory.`); throw error; } }
     finally { operation = null; target?.cancel(); target = null; setState('idle'); }
   }
-  handle('status', async () => ({state, settings, models: MODELS, maxSeconds: MAX_SECONDS, lastTranscript, canRetry: Boolean(lastAudio), shortcutReady, keyboardError: keyboard.error, startupNotice, platform: process.platform, packaged: app.isPackaged, installation:{version:app.getVersion(),path:app.isPackaged?app.getPath('exe'):app.getAppPath()},
+  handle('update-check', () => updates.check());
+  handle('update-install', () => updates.install());
+  handle('status', async () => ({updates: updates.status, state, settings, models: MODELS, maxSeconds: MAX_SECONDS, lastTranscript, canRetry: Boolean(lastAudio), shortcutReady, keyboardError: keyboard.error, startupNotice, platform: process.platform, packaged: app.isPackaged, installation:{version:app.getVersion(),path:app.isPackaged?app.getPath('exe'):app.getAppPath()},
     hardware, setup, permissions: await permissionStatus(), connections: await connections.status(), activeMeeting, ...(await ready())}));
   handle('settings', async value => {
     if (state !== 'idle' || savingSettings) throw new Error('Wait for the current operation or preference save to finish.');
@@ -225,6 +231,7 @@ async function start(options) {
   });
   handle('login-at-startup', async enabled => { if (typeof enabled !== 'boolean' || !app.isPackaged) throw new Error('Launch at login is available in the installed MatiQ Voice app.'); app.setLoginItemSettings({openAtLogin: enabled}); setup.launchAtLogin = enabled; await saveJSON(setupFile, setup); });
   handle('begin', async () => {
+    if (updates.installing) throw new Error('MatiQ Voice is restarting to update.');
     if (state !== 'idle') throw new Error('Finish the current operation first.');
     if (connections.pending.size) throw new Error('Finish or cancel account sign-in before recording.');
     if (!setup.completed) throw new Error('Complete setup before dictating.');
@@ -251,6 +258,7 @@ async function start(options) {
   handle('open-meeting', async url => shell.openExternal(meetingURL(url)));
   handle('meeting-list', () => meetings.list()); handle('meeting-get', id => meetings.get(id));
   handle('meeting-begin', async value => {
+    if (updates.installing) throw new Error('MatiQ Voice is restarting to update.');
     if (state !== 'idle' || !setup.completed) throw new Error('Complete setup and finish other recording before starting a meeting.');
     if (connections.pending.size) throw new Error('Finish or cancel account sign-in before recording.');
     const availability = await ready(); if (!availability.modelReady || !availability.speakerReady) throw new Error('Download the local speech and speaker models first.');
@@ -300,6 +308,8 @@ async function start(options) {
   try { await keyboard.start(); } catch (error) { startupNotice += ` ${error.message}`; }
   if (!globalShortcut.register('CommandOrControl+Alt+Backspace', () => send({type: 'cancel'}))) startupNotice += ' The cancel shortcut is unavailable. Use the app controls.';
   await hud.loadURL(hudURL); await win.loadURL(pageURL);
+  updateTimer = setTimeout(() => updates.check(), 15000); updateTimer.unref();
+  updateInterval = setInterval(() => updates.check(), 6 * 60 * 60 * 1000); updateInterval.unref();
   show();
 }
 if (require.main === module) launch();

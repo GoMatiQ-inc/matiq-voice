@@ -33,6 +33,11 @@ function paint() {
   $('model-status').textContent = snapshot.modelReady && snapshot.speakerReady ? 'Speech and speaker models are installed. Recognition can run offline.' : 'Download the selected speech model and speaker models before completing setup.';
   $('launch-login').disabled = !snapshot.packaged;
   $('quit-app').disabled = !idle || starting;
+  const update = snapshot.updates;
+  $('update-status').textContent = update.message;
+  $('update-check').disabled = ['disabled', 'checking', 'downloading', 'ready'].includes(update.phase);
+  $('update-install').hidden = update.phase !== 'ready';
+  $('update-install').disabled = !idle || starting;
   $('installation').textContent = `Version ${snapshot.installation.version} · ${snapshot.installation.path}`;
   $('shortcut').textContent = `Toggle: ${bindingLabel(snapshot.settings.bindings.toggle)} · Hold: ${bindingLabel(snapshot.settings.bindings.hold)}`;
   for (const mode of ['toggle','hold']) $(`binding-${mode}`).textContent=bindingLabel(snapshot.settings.bindings[mode]);
@@ -268,7 +273,10 @@ async function loadCalendar() {
   }
   $('calendar-status').textContent = count ? `${count} upcoming meeting${count === 1 ? '' : 's'}` : 'No upcoming conference links found. Connect an account in Settings or record manually.';
 }
+$('update-check').onclick = () => api.checkUpdates().catch(showError);
+$('update-install').onclick = () => api.installUpdate().catch(showError);
 api.onEvent(event => {
+  if (event.type === 'updates' && snapshot) { snapshot.updates = event.update; paint(); }
   if (event.type === 'toggle') toggle().catch(showError);
   if (event.type === 'dictation-start' && !starting && !recorder && state==='idle') {shortcutStopPending=false;begin().catch(showError);}
   if (event.type === 'dictation-stop') { if(starting && state!=='processing') shortcutStopPending=true; else if(recorder) finish().catch(showError); }
