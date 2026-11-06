@@ -10,6 +10,7 @@ test('Mac signing requires both public-distribution certificates and notarizatio
   const result = signingConfig('darwin', mac, config);
   assert.equal(result.mac.identity, 'Fixture (TESTTEAM01)'); assert.equal(result.pkg.identity, 'Fixture (TESTTEAM01)');
   assert.equal(result.extraMetadata.matiqOfficialUpdates, true); assert.equal(result.publish[0].repo, 'matiq-voice');
+  assert.deepEqual(require('../package.json').build.mac.target, result.mac.target, 'Keep default and signed targets aligned: Electron Builder merges target arrays.');
   assert.equal(result.mac.notarize, true); assert.ok(result.mac.binaries.includes('Contents/Resources/engine/mac-keys'));
   assert.ok(!JSON.stringify(result).includes(mac.APPLE_APP_SPECIFIC_PASSWORD));
 });

@@ -1,7 +1,7 @@
 {
   "name": "matiq-voice",
   "productName": "MatiQ Voice",
-  "version": "0.3.8",
+  "version": "0.3.7",
   "private": true,
   "description": "Private English dictation and meeting notes by MatiQ.",
   "author": "MatiQ Inc",
@@ -60,7 +60,6 @@
       "category": "public.app-category.productivity",
       "target": [
         "pkg",
-        "dmg",
         "zip"
       ],
       "hardenedRuntime": true,

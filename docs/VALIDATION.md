@@ -278,7 +278,10 @@ inferred from those fixture tests.
 The wordmark is byte-identical to `assets/logo/matiq-solutions-wordmark-dark@2x.png`
 in the canonical brand repository at commit
 `b8698a2e488370ec7aee0b134af86cb47bc6c0f2` (brand PR 44).
-Version 0.3.8 advances the version for installed upgrade qualification from the
-0.3.7 signed bridge. After explicit restart consent, Windows uses silent update
-installation rather than repeating the setup wizard. Mac update behavior is unchanged. Signed bridge/target verification
-and the installed upgrade result remain pending until recorded below.
+Protected signing run 42136995590 successfully notarized the app and PKG, then
+stopped at the metadata gate: Electron Builder merged the old DMG target into
+the signed target list. The build defaults now match the signed PKG/ZIP targets;
+a configuration regression reproduces the mismatch before the correction. No
+artifact from that failed run was published. A new protected run and actual
+installed upgrade remain required. After explicit restart consent, Windows
+uses silent update installation rather than repeating the setup wizard.
