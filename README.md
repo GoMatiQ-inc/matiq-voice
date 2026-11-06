@@ -76,7 +76,9 @@ package checksum and operating-system code signature before installation.
 Normal macOS administrator or privacy prompts may still apply. Update checks
 contact GitHub for release metadata and packages; they do not upload audio or
 transcripts. Offline use continues normally; failed updates appear in Settings
-and can be retried.
+and can be retried. If a third-party firewall blocks GitHub or its download
+servers, allow the required updater traffic according to your network policy
+and use **Check for updates** again.
 
 Development builds and unsigned previews do not update automatically. Windows
 automatic updates require an official signed Windows release; Microsoft company

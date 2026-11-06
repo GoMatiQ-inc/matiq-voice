@@ -264,7 +264,8 @@ inferred from those fixture tests.
   pixels unchanged. Voice remains a separate text label and divider.
 - Header spacing accommodates the two-line mark at standard and narrow sidebar
   widths. Native E2E verifies the exact approved asset and separate Voice label.
-  Review of the installed header remains pending.
+  The installed header was also reviewed on two Apple Silicon Macs: the
+  Solutions lockup and separate Voice label render correctly.
 
 ## Automatic update implementation
 
@@ -274,7 +275,7 @@ inferred from those fixture tests.
 - Native desktop CI run [42136050078](https://github.com/GoMatiQ-inc/matiq-voice/actions/runs/42136050078) passed on macOS ARM64 and Windows x64: 52 unit tests, desktop E2E including the approved Solutions asset and updater IPC during recording, packaging, packaged native inference and the platform-specific installer/caret checks. The updater is a fixture in desktop E2E, not an actual installed signed upgrade.
 - Corrected protected bridge run [42139442403](https://github.com/GoMatiQ-inc/matiq-voice/actions/runs/42139442403) passed both desktop jobs and Mac signing, app/PKG notarization and stapling, Gatekeeper, extracted update ZIP verification, metadata checks and packaged native inference for 0.3.7.
 - Protected target run [42140167512](https://github.com/GoMatiQ-inc/matiq-voice/actions/runs/42140167512) passed the same gates for 0.3.8. Both native platform jobs pass; Windows signing remains externally blocked by Microsoft company verification.
-- Actual installed signed upgrade and user-data preservation qualification remain pending. These native CI and fixture results do not claim an installed upgrade has completed.
+- Operator-assisted installed upgrades from 0.3.7 to 0.3.8 completed on two Apple Silicon Macs. Each app downloaded and verified its own release update; the official signed ShipIt helper applied that staged update with administrator authentication. The setup PKG was not rerun. Both updated apps pass strict code-signature and Gatekeeper checks.
 
 The wordmark is byte-identical to `assets/logo/matiq-solutions-wordmark-dark@2x.png`
 in the canonical brand repository at commit
@@ -292,4 +293,26 @@ window-first update shutdown and confirms the window closes rather than hiding
 in the tray. Ordinary close-to-tray and recording interlocks still pass.
 
 Version 0.3.8 is the newer target for installed upgrade qualification from the
-corrected 0.3.7 bridge. App code is unchanged from that bridge. Protected signing has passed. The actual installed upgrade remains pending.
+corrected 0.3.7 bridge. App code is unchanged from that bridge. Protected signing
+and the operator-assisted installed upgrade checks have passed.
+
+### Installed upgrade scope
+
+- Saved settings/setup file hashes and the sizes/modification times of all three
+  local model files were unchanged on both devices. Custom bindings were
+  preserved. The meeting-file inventories were unchanged; these devices had no
+  saved meeting files, so non-empty meeting preservation remains covered by
+  fixture tests rather than this installed upgrade.
+- The updated app opens from `/Applications`, retains the Solutions wordmark
+  and shows active background keyboard access. The current-version update
+  check succeeds on the unrestricted test device.
+- Administrator authentication and final application were operator-assisted.
+  Automated control of the protected macOS authentication dialog was unavailable;
+  the official ShipIt helper was invoked against the app-generated staged
+  request, with credentials supplied only in memory. The app was then reopened
+  under the original user. This is not an unattended password-dialog or
+  automatic-relaunch qualification. Ordinary users can still receive macOS
+  administrator approval prompts for a root-owned installation.
+- A third-party outbound firewall initially blocked GitHub requests on one
+  device. Endpoint-only, process-lifetime allowances permitted the in-app
+  download; no blanket or permanent firewall allowance was introduced.
