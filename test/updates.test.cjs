@@ -46,12 +46,14 @@ test('concurrent checks are serialized and installation failures are visible', a
   f.updater.quitAndInstall=()=>{throw new Error('Installer unavailable');};
   assert.throws(()=>f.service.install(),/Installer unavailable/); assert.equal(f.service.installing,false);
   assert.equal(f.service.status.phase,'error');
+  f.updater.checkForUpdates=async()=>({isUpdateAvailable:false});
+  await f.service.check(); assert.equal(f.service.status.phase,'current');
 });
 
 test('asynchronous native install failure remains visible and cannot resume audio before reopening', async () => {
   const f=fixture(); await f.service.check(); f.service.install();
   assert.equal(f.service.status.phase,'installing');
   f.updater.emit('error',new Error('Signature rejected'));
-  assert.equal(f.service.installing,true);
+  assert.equal(f.service.installing,true); assert.equal(f.service.status.restartPending,true);
   assert.match(f.service.status.message,/Quit and reopen/);
 });

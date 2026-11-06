@@ -35,7 +35,7 @@ function paint() {
   $('quit-app').disabled = !idle || starting;
   const update = snapshot.updates;
   $('update-status').textContent = update.message;
-  $('update-check').disabled = ['disabled', 'checking', 'downloading', 'ready', 'installing'].includes(update.phase);
+  $('update-check').disabled = update.restartPending || ['disabled', 'checking', 'downloading', 'ready', 'installing'].includes(update.phase);
   $('update-install').hidden = update.phase !== 'ready';
   $('update-install').disabled = !idle || starting;
   $('installation').textContent = `Version ${snapshot.installation.version} · ${snapshot.installation.path}`;

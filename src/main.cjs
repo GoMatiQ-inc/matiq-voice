@@ -73,7 +73,7 @@ async function start(options) {
       {label: activeMeeting ? 'Stop meeting recording' : 'Record meeting', enabled: state === 'idle' || state === 'meeting-recording', click: () => activeMeeting ? send({type: 'stop-meeting'}) : (show(), send({type: 'navigate', page: 'meetings'}))},
       {label: 'Copy last transcript', enabled: Boolean(lastTranscript), click: () => clipboard.writeText(lastTranscript)},
       {label: 'Settings', click: () => { show(); send({type: 'navigate', page: 'settings'}); }},
-      {label: updates.status.phase === 'ready' ? 'Restart to update' : 'Check for updates', enabled: updates.status.phase === 'ready' ? state === 'idle' : !['disabled', 'checking', 'downloading'].includes(updates.status.phase), click: () => { show(); send({type: 'navigate', page: 'settings'}); if (updates.status.phase === 'ready') { try { updates.install(); } catch (error) { notice(error.message); } } else updates.check(); }},
+      {label: updates.status.phase === 'ready' ? 'Restart to update' : 'Check for updates', enabled: !updates.status.restartPending && (updates.status.phase === 'ready' ? state === 'idle' : !['disabled', 'checking', 'downloading'].includes(updates.status.phase)), click: () => { show(); send({type: 'navigate', page: 'settings'}); if (updates.status.phase === 'ready') { try { updates.install(); } catch (error) { notice(error.message); } } else updates.check(); }},
       {type: 'separator'}, {label: 'Quit MatiQ Voice', click: () => app.quit()}
     ]));
   }

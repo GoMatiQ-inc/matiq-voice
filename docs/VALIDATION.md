@@ -267,7 +267,7 @@ inferred from those fixture tests.
 
 ## Automatic update implementation
 
-- 51 Node tests pass on the Linux development host, including idle-only install,
+- 52 Node tests pass on the Linux development host, including idle-only install,
   explicit restart, disabled unsigned builds, serialized checks, visible network
   and checksum errors, and rejection of changed update ZIP bytes.
 - Native desktop CI now exercises the approved Solutions asset and updater IPC

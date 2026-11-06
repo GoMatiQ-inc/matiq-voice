@@ -3,7 +3,7 @@ function createUpdates({updater, enabled, isIdle, emit}) {
   let status = {phase: enabled ? 'idle' : 'disabled', message: enabled ? 'Updates are checked automatically.' : 'Automatic updates are available in official signed releases.'};
   let busy = false, downloaded = false, installing = false;
   const listeners = [];
-  const publish = patch => { status = {...status, ...patch}; emit({...status}); };
+  const publish = patch => { status = {...status, ...patch, restartPending: installing}; emit({...status}); };
   const fail = error => publish({phase: 'error', message: installing ? `Update installation failed: ${error.message}. Quit and reopen MatiQ Voice before recording again.` : `Update failed. Check your connection and try again: ${error.message}`});
   if (enabled) {
     updater.autoDownload = false;
@@ -39,7 +39,7 @@ function createUpdates({updater, enabled, isIdle, emit}) {
     installing = true;
     publish({phase: 'installing', message: 'Verifying the update and restarting MatiQ Voice…'});
     try { updater.quitAndInstall(false, true); }
-    catch (error) { installing = false; fail(error); throw error; }
+    catch (error) { installing = false; downloaded = false; fail(error); throw error; }
   }
   return {check, install, get installing() { return installing; }, get status() { return {...status}; }, dispose() { for (const [name, fn] of listeners) updater.removeListener(name, fn); }};
 }
