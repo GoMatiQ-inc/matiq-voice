@@ -270,9 +270,18 @@ inferred from those fixture tests.
 - 52 Node tests pass on the Linux development host, including idle-only install,
   explicit restart, disabled unsigned builds, serialized checks, visible network
   and checksum errors, and rejection of changed update ZIP bytes.
-- Native desktop CI now exercises the approved Solutions asset and updater IPC
-  during recording using a fixture updater. This is a lifecycle test, not an
-  actual installed signed upgrade. Results are pending.
+- Native desktop CI run [42136050078](https://github.com/GoMatiQ-inc/matiq-voice/actions/runs/42136050078) passed on macOS ARM64 and Windows x64: 52 unit tests, desktop E2E including the approved Solutions asset and updater IPC during recording, packaging, packaged native inference and the platform-specific installer/caret checks. The updater is a fixture in desktop E2E, not an actual installed signed upgrade.
 - Signed updater ZIP extraction, signature/notarization checks and a real
   installed-app upgrade remain release qualification gates; no completed
   upgrade is claimed here. Windows signing remains externally blocked.
+
+The wordmark is byte-identical to `assets/logo/matiq-solutions-wordmark-dark@2x.png`
+in the canonical brand repository at commit
+`b8698a2e488370ec7aee0b134af86cb47bc6c0f2` (brand PR 44).
+Protected signing run 42136995590 successfully notarized the app and PKG, then
+stopped at the metadata gate: Electron Builder merged the old DMG target into
+the signed target list. The build defaults now match the signed PKG/ZIP targets;
+a configuration regression reproduces the mismatch before the correction. No
+artifact from that failed run was published. A new protected run and actual
+installed upgrade remain required. After explicit restart consent, Windows
+uses silent update installation rather than repeating the setup wizard.

@@ -8,7 +8,7 @@ function fixture(enabled = true) {
   updater.setFeedURL = feed => assert.deepEqual(feed, {provider:'github', owner:'GoMatiQ-inc', repo:'matiq-voice'});
   updater.checkForUpdates = async () => { checks++; return {isUpdateAvailable:true, cancellationToken:{}, updateInfo:{version:'0.3.8'}}; };
   updater.downloadUpdate = async () => { downloads++; updater.emit('update-downloaded', {version:'0.3.8'}); };
-  updater.quitAndInstall = (silent, restart) => { assert.equal(silent,false); assert.equal(restart,true); installs++; };
+  updater.quitAndInstall = (silent, restart) => { assert.equal(silent,true); assert.equal(restart,true); installs++; };
   const service = createUpdates({updater, enabled, isIdle:()=>idle, emit:event=>events.push(event)});
   return {updater, service, events, setIdle:value=>idle=value, counts:()=>({installs,downloads,checks})};
 }

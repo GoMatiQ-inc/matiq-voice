@@ -60,7 +60,6 @@
       "category": "public.app-category.productivity",
       "target": [
         "pkg",
-        "dmg",
         "zip"
       ],
       "hardenedRuntime": true,
