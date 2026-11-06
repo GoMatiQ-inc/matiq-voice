@@ -263,7 +263,8 @@ inferred from those fixture tests.
 - The header uses the approved family-brand Solutions wordmark, with its source
   pixels unchanged. Voice remains a separate text label and divider.
 - Header spacing accommodates the two-line mark at standard and narrow sidebar
-  widths. All 46 Node tests pass. Native visual/E2E qualification is pending.
+  widths. Native E2E verifies the exact approved asset and separate Voice label.
+  Review of the installed header remains pending.
 
 ## Automatic update implementation
 
@@ -285,3 +286,13 @@ a configuration regression reproduces the mismatch before the correction. No
 artifact from that failed run was published. A new protected run and actual
 installed upgrade remain required. After explicit restart consent, Windows
 uses silent update installation rather than repeating the setup wizard.
+
+Native regression run [42138703448](https://github.com/GoMatiQ-inc/matiq-voice/actions/runs/42138703448)
+passed on macOS ARM64 and Windows x64 with 52 unit tests, desktop E2E, packaging
+and packaged speech inference. Desktop E2E now also reproduces the native
+window-first update shutdown and confirms the window closes rather than hiding
+in the tray. Ordinary close-to-tray and recording interlocks still pass.
+
+Version 0.3.8 is the newer target for installed upgrade qualification from the
+corrected 0.3.7 bridge. App code is unchanged from that bridge. Protected signing
+and the actual installed upgrade still require completed verification.
