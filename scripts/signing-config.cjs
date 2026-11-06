@@ -4,7 +4,7 @@ function signingConfig(platform, env, config) {
   if (platform === 'darwin') {
     if (!env.CSC_NAME?.startsWith('Developer ID Application:') || !env.CSC_INSTALLER_NAME?.startsWith('Developer ID Installer:')) throw new Error('Provide both Developer ID Application and Developer ID Installer identities.');
     if (!(env.APPLE_API_KEY && env.APPLE_API_KEY_ID && env.APPLE_API_ISSUER) && !(env.APPLE_ID && env.APPLE_APP_SPECIFIC_PASSWORD && env.APPLE_TEAM_ID)) throw new Error('Configure Apple notarization credentials; unsigned or unnotarized releases are not permitted.');
-    result.mac = {identity: env.CSC_NAME.slice('Developer ID Application:'.length).trim(), notarize: true, binaries: ['whisper-cli', 'mac-input', 'mac-keys'].map(name => `Contents/Resources/engine/${name}`)};
+    result.mac = {target: ['pkg', 'zip'], identity: env.CSC_NAME.slice('Developer ID Application:'.length).trim(), notarize: true, binaries: ['whisper-cli', 'mac-input', 'mac-keys'].map(name => `Contents/Resources/engine/${name}`)};
     result.pkg = {identity: env.CSC_INSTALLER_NAME.slice('Developer ID Installer:'.length).trim()};
   } else if (platform === 'win32') {
     result.win = {signExts: ['.dll', '.node']};
