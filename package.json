@@ -1,7 +1,7 @@
 {
   "name": "matiq-voice",
   "productName": "MatiQ Voice",
-  "version": "0.3.10",
+  "version": "0.3.11",
   "private": true,
   "description": "Private English dictation and meeting notes by MatiQ.",
   "author": "MatiQ Inc",
@@ -19,7 +19,8 @@
     "test:focus": "node scripts/e2e-focus.mjs",
     "test:packaged": "node scripts/e2e-packaged.mjs",
     "test:installer": "node scripts/check-mac-installer.mjs",
-    "icons:mac": "node scripts/build-mac-icon.mjs"
+    "icons:mac": "node scripts/build-mac-icon.mjs",
+    "test:capture": "node scripts/e2e-capture.mjs"
   },
   "devDependencies": {
     "electron": "45.0.0",
