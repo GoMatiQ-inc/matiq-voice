@@ -21,10 +21,13 @@ function launch(options = {}) {
 }
 async function start(options) {
   const host = options.host;
+  let lease,shuttingDown=false,checkingClose=false,disposed=false;
+  const requests=new Set();
   const listeners = [];
   const ownedChildren = new Set();
   const listen = (emitter,event,fn) => {emitter.on(event,fn);listeners.push([emitter,event,fn]);};
   await app.whenReady();
+  if(!host)lease=await require("@matiq-solutions/runtime/tool-lease.cjs").acquireToolLease({root:path.join(app.getPath("appData"),"MatiQ Solutions","tool-locks"),id:"com.matiq.voice",owner:app.getName()});
   const dataDir = host?.dataDir || app.getPath('userData'); await fs.mkdir(dataDir, {recursive: true});
   const modelDir = path.join(dataDir, 'models'), jobsDir = path.join(dataDir, 'temporary-recordings');
   const settingsFile = path.join(dataDir, 'settings.json'), setupFile = path.join(dataDir, 'setup.json');
@@ -91,7 +94,7 @@ async function start(options) {
       {label: activeMeeting ? 'Stop meeting recording' : 'Record meeting', enabled: state === 'idle' || state === 'meeting-recording', click: () => activeMeeting ? send({type: 'stop-meeting'}) : (show(), send({type: 'navigate', page: 'meetings'}))},
       {label: 'Copy last transcript', enabled: Boolean(lastTranscript), click: () => clipboard.writeText(lastTranscript)},
       {label: 'Settings', click: () => { show(); send({type: 'navigate', page: 'settings'}); }},
-      {label: updates.status.phase === 'ready' ? 'Restart to update' : 'Check for updates', enabled: !updates.status.restartPending && (updates.status.phase === 'ready' ? state === 'idle' : !['disabled', 'checking', 'downloading'].includes(updates.status.phase)), click: () => { show(); send({type: 'navigate', page: 'settings'}); if (updates.status.phase === 'ready') { try { updates.install(); } catch (error) { notice(error.message); } } else updates.check(); }},
+      {label: updates.status.phase === 'ready' ? 'Restart to update' : 'Check for updates', enabled: !updates.status.restartPending && (updates.status.phase === 'ready' ? state === 'idle' : !['disabled', 'checking', 'downloading'].includes(updates.status.phase)), click: () => { show(); send({type: 'navigate', page: 'settings'}); if (updates.status.phase === 'ready') installUpdate().catch(error=>notice(error.message)); else updates.check(); }},
       {type: 'separator'}, {label: host ? 'Close Voice' : 'Quit MatiQ Voice', click: () => host ? host.close().catch(error=>notice(error.message)) : app.quit()}
     ]));
   }
@@ -130,9 +133,8 @@ async function start(options) {
   app.on('activate', show); app.on('second-instance', show);
   app.on('before-quit', event => {
     if (activeMeeting && ['meeting-recording', 'meeting-preparing', 'meeting-paused'].includes(state) && !quitting) { event.preventDefault(); send({type: 'quit-after-meeting'}); show(); return; }
-    quitting = true; operation?.abort(); worker?.kill(); target?.cancel();
-    for (const provider of ['microsoft', 'google']) connections.cancel(provider);
-    if (awake !== null) powerSaveBlocker.stop(awake);
+    if(quitting)return;event.preventDefault();if(checkingClose)return;checkingClose=true;
+    prepareClose().then(async()=>{await dispose();quitting=true;app.quit();}).catch(async error=>{shuttingDown=disposed;if(!workspace.isDestroyed())await workspace.executeJavaScript('document.documentElement.inert=false');notice(error.message);show();}).finally(()=>{checkingClose=false;});
   });
   app.on('will-quit', () => { clearTimeout(updateTimer); clearInterval(updateInterval); updates.dispose(); keyboard.stop(); globalShortcut.unregisterAll(); });
   }
@@ -158,7 +160,15 @@ async function start(options) {
     Promise.resolve(interrupted ? meetings.stop(interrupted) : null).catch(error => dialog.showErrorBox('Meeting recovery failed', error.message));
     dialog.showMessageBox({type: 'error', message: 'The recording window stopped.', detail: `Reason: ${details.reason}. Completed meeting chunks remain on this computer. Unsaved audio in progress was lost.`, buttons: ['Reload', 'Quit']}).then(({response}) => response === 0 ? workspace.reload() : host ? host.close().catch(error=>notice(error.message)) : app.quit());
   });
-  function handle(channel, fn) { if(host){host.handle(channel,fn);return;} ipcMain.handle(channel, (event, ...args) => { if (event.sender !== workspace || !isOwnFrame(event.senderFrame)) throw new Error('Untrusted application frame.'); return fn(...args); }); }
+  function handle(channel, fn) {
+    const invoke=async(...args)=>{
+      if(shuttingDown&&channel!=='quit')throw Error('Voice is closing or updating. Quit and reopen it before starting more work.');
+      const request=Promise.resolve().then(()=>fn(...args));requests.add(request);
+      try{return await request;}finally{requests.delete(request);}
+    };
+    if(host){host.handle(channel,invoke);return;}
+    ipcMain.handle(channel, (event,...args)=>{if(event.sender!==workspace||!isOwnFrame(event.senderFrame))throw Error('Untrusted application frame.');return invoke(...args);});
+  }
   listen(ipcMain,'hud-action', (event, action) => { if (event.sender !== hud.webContents || event.senderFrame?.url !== hudURL) return; if (action === 'stop') send({type: activeMeeting ? 'stop-meeting' : 'toggle'}); if (action === 'cancel' && !activeMeeting) send({type: 'cancel'}); });
   handle('meter', ({level, seconds}) => { if (!Number.isFinite(level) || !Number.isFinite(seconds)) return; hud.webContents.send('hud-meter', {level: Math.min(1, Math.max(0, level)), seconds: Math.max(0, seconds)}); });
   async function ready() {
@@ -192,7 +202,7 @@ async function start(options) {
     finally { operation = null; target?.cancel(); target = null; setState('idle'); }
   }
   handle('update-check', () => updates.check());
-  handle('update-install', () => updates.install());
+  handle('update-install', () => {setImmediate(()=>installUpdate().catch(error=>notice(error.message)));return {requested:true};});
   handle('status', async () => ({updates: updates.status, state, settings, models: MODELS, maxSeconds: MAX_SECONDS, lastTranscript, canRetry: Boolean(lastAudio), shortcutReady, keyboardError: keyboard.error, startupNotice, platform: process.platform, packaged: app.isPackaged, hosted:Boolean(host),applicationName:app.getName(),installation:{version:host?.manifest.version||app.getVersion(),path:app.isPackaged?app.getPath('exe'):app.getAppPath()},
     hardware, setup, sharedModels, familyModelRoot, permissions: await permissionStatus(), connections: await connections.status(), activeMeeting, ...(await ready())}));
   handle('settings', async value => {
@@ -328,11 +338,41 @@ async function start(options) {
     const text = [`# ${meeting.title}`, '', '## Transcript', ...meeting.segments.map(segment => `${Math.floor(segment.startMs / 60000)}:${String(Math.floor(segment.startMs / 1000) % 60).padStart(2, '0')} ${meeting.speakers[segment.speaker] || 'Unassigned'}: ${segment.text}`), '', '## Personal notes', meeting.personalNotes, '', '## Extracted notes', ...(meeting.notes?.actions || []).map(note => `- ${note.text} [${Math.floor(note.startMs / 1000)}s]`) ].join('\n');
     await fs.writeFile(result.filePath, text, {mode: 0o600}); return true;
   });
-  handle('quit', () => host ? host.close() : app.quit());
+  handle('quit', () => {if(host)return host.close();setImmediate(()=>app.quit());return {requested:true};});
   try { await keyboard.start(); } catch (error) { startupNotice += ` ${error.message}`; }
   if (!globalShortcut.register('CommandOrControl+Alt+Backspace', () => send({type: 'cancel'}))) startupNotice += ' The cancel shortcut is unavailable. Use the app controls.';
-  async function dispose(){
-      clearTimeout(updateTimer);clearInterval(updateInterval);updates.dispose();
+  async function toolStatus(){
+    if(disposed)return {busy:false,background:true};
+
+      const busy=()=>state!=='idle'||Boolean(activeMeeting||operation||lastAudio||savingSettings||connections.pending.size||keyboard.router.recording);
+      if(busy())return {busy:true,background:true,reason:state!=='idle'?state:lastAudio?'retry or clear retained audio':'finish pending work'};
+      const editing=await workspace.executeJavaScript("Boolean([...document.querySelectorAll('#personal-notes,.speaker-row input')].some(input=>input.value!==input.defaultValue)||document.querySelector('#binding-dialog[open]'))");
+      return {busy:busy()||editing,background:true,reason:editing?'save your meeting notes, speaker names or binding first':'finish pending work'};
+
+  }
+  async function prepareClose(){
+    const initial=await toolStatus();if(initial.busy)throw Error('Finish Voice work before closing: '+initial.reason);
+    await workspace.executeJavaScript('document.documentElement.inert=true');
+    let timer;
+    try{
+      await Promise.race([Promise.allSettled([...requests]),new Promise(resolve=>{timer=setTimeout(resolve,1000);})]);
+      if(requests.size)throw Error('Wait for the current Voice request to finish before closing.');
+      const final=await toolStatus();if(final.busy)throw Error('Finish Voice work before closing: '+final.reason);
+      if(requests.size)throw Error('Wait for the current Voice request to finish before closing.');
+      shuttingDown=true;
+    }catch(error){await workspace.executeJavaScript('document.documentElement.inert=false');throw error;}
+    finally{clearTimeout(timer);}
+  }
+  async function installUpdate(){
+    if(host)return updates.install();
+    if(updates.status.phase!=='ready')throw Error('Download an update before restarting.');
+    await prepareClose();await dispose({forUpdate:true});quitting=true;
+    try{return updates.install();}catch(error){quitting=false;notice('Update could not start. Quit and reopen Voice: '+error.message);throw error;}
+  }
+  async function dispose({forUpdate=false}={}){
+      if(disposed)return;
+      shuttingDown=true;
+      clearTimeout(updateTimer);clearInterval(updateInterval);if(!forUpdate)updates.dispose();
       for(const [emitter,event,fn] of listeners)emitter.removeListener(event,fn);
       for(const provider of ['microsoft','google'])connections.cancel(provider);
       operation?.abort();target?.cancel();
@@ -342,21 +382,18 @@ async function start(options) {
       keyboard.stop();worker?.kill();await Promise.all(stopped);ownedChildren.clear();
       globalShortcut.unregister('CommandOrControl+Alt+Backspace');
       if(awake!==null)powerSaveBlocker.stop(awake);
-      hud.destroy();tray.destroy();
+      if(!forUpdate){hud.destroy();tray.destroy();}
+      await lease?.release();disposed=true;
   }
   try {
   await hud.loadURL(hudURL); await workspace.loadURL(pageURL);
+  if(!host)await require("@matiq-solutions/shell").apply(workspace);
   if(!host){updateTimer = setTimeout(() => updates.check(), 15000); updateTimer.unref();
   updateInterval = setInterval(() => updates.check(), 6 * 60 * 60 * 1000); updateInterval.unref();}
   show();
   } catch(error){await dispose();throw error;}
   return {
-    status:async()=>{
-      const busy=()=>state!=='idle'||Boolean(activeMeeting||operation||lastAudio||savingSettings||connections.pending.size||keyboard.router.recording);
-      if(busy())return {busy:true,background:true,reason:state!=='idle'?state:lastAudio?'retry or clear retained audio':'finish pending work'};
-      const editing=await workspace.executeJavaScript("Boolean([...document.querySelectorAll('#personal-notes,.speaker-row input')].some(input=>input.value!==input.defaultValue)||document.querySelector('#binding-dialog[open]'))");
-      return {busy:busy()||editing,background:true,reason:editing?'save your meeting notes, speaker names or binding first':'finish pending work'};
-    },
+    status:toolStatus,
     onVisibility:visible=>{if(!visible&&keyboard.router.recording){keyboard.cancelRecord();send({type:'binding-cancelled',message:'Binding recording cancelled when you left Voice.'});}},
     dispose
   };
