@@ -257,3 +257,10 @@ inferred from those fixture tests.
   passed the merged 0.3.6 source, both desktop package jobs, Developer ID
   app/native-helper and Installer signatures, app and PKG notarization,
   stapling, Gatekeeper and packaged speech inference.
+
+## MatiQ Solutions header
+
+- The header uses the approved family-brand Solutions wordmark, with its source
+  pixels unchanged. Voice remains a separate text label and divider.
+- Header spacing accommodates the two-line mark at standard and narrow sidebar
+  widths. All 46 Node tests pass. Native visual/E2E qualification is pending.
