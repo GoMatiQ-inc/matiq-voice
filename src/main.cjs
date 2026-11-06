@@ -12,6 +12,7 @@ const {MeetingStore} = require('./meetings.cjs');
 const {captureTarget,readPasteAccess} = require('./input.cjs');
 const {Keyboard} = require('./keyboard.cjs');
 const {createUpdates} = require('./updates.cjs');
+const {watch,hasExited,waitForExit} = require('./child-lifecycle.cjs');
 
 function launch(options = {}) {
   app.setName('MatiQ Voice');
@@ -19,11 +20,15 @@ function launch(options = {}) {
   return start(options).catch(error => { dialog.showErrorBox('MatiQ Voice could not start', error.message); app.quit(); });
 }
 async function start(options) {
+  const host = options.host;
+  const listeners = [];
+  const ownedChildren = new Set();
+  const listen = (emitter,event,fn) => {emitter.on(event,fn);listeners.push([emitter,event,fn]);};
   await app.whenReady();
-  const dataDir = app.getPath('userData'); await fs.mkdir(dataDir, {recursive: true});
+  const dataDir = host?.dataDir || app.getPath('userData'); await fs.mkdir(dataDir, {recursive: true});
   const modelDir = path.join(dataDir, 'models'), jobsDir = path.join(dataDir, 'temporary-recordings');
   const settingsFile = path.join(dataDir, 'settings.json'), setupFile = path.join(dataDir, 'setup.json');
-  const engineDir = app.isPackaged ? path.join(process.resourcesPath, 'engine') : path.join(__dirname, '..', 'engine');
+  const engineDir = host ? path.join(host.resourceDir,'engine') : app.isPackaged ? path.join(process.resourcesPath, 'engine') : path.join(__dirname, '..', 'engine');
   const binary = path.join(engineDir, process.platform === 'win32' ? 'whisper-cli.exe' : 'whisper-cli');
   const pageURL = pathToFileURL(path.join(__dirname, 'ui', 'index.html')).href;
   const hudURL = pathToFileURL(path.join(__dirname, 'ui', 'hud.html')).href;
@@ -34,7 +39,7 @@ async function start(options) {
   let setup = {completed: false, microphoneTested: false, permissionsReviewed: false, launchAtLogin: false};
   try { setup = {...setup, ...JSON.parse(await fs.readFile(setupFile, 'utf8'))}; }
   catch (error) { if (error.code !== 'ENOENT') startupNotice += ' Setup progress was damaged; complete setup again.'; }
-  const familyModelRoot = options.sharedModelRoot || sharedRoot();
+  const familyModelRoot = host?.sharedModelRoot || options.sharedModelRoot || sharedRoot();
   let sharedModels = [];
   try { sharedModels = await adoptExistingAssets([...Object.keys(MODELS).map(speechAsset),...SPEAKER_MODELS],modelDir,familyModelRoot); }
   catch(error) { startupNotice += ` Model sharing could not finish: ${error.message}`; }
@@ -50,26 +55,33 @@ async function start(options) {
   await fs.rm(jobsDir, {recursive: true, force: true}); await fs.mkdir(jobsDir, {recursive: true, mode: 0o700});
   let state = 'idle', lastTranscript = '', lastAudio = null, target = null, savingSettings = false;
   let operation = null, quitting = false, shortcutReady = false, generation = 0, activeMeeting = null, worker = null, awake = null;
-  const win = new BrowserWindow({width: 1120, height: 820, minWidth: 840, minHeight: 640, title: 'MatiQ Voice', backgroundColor: '#ffffff', show: false,
+  const win = host?.window || new BrowserWindow({width: 1120, height: 820, minWidth: 840, minHeight: 640, title: 'MatiQ Voice', backgroundColor: '#ffffff', show: false,
     webPreferences: {preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false}});
+  const workspace = host?.view.webContents || win.webContents;
   const hud = new BrowserWindow({width: 248, height: 60, frame: false, transparent: true, hasShadow: false, resizable: false, focusable: false, alwaysOnTop: true, skipTaskbar: true, show: false,
     webPreferences: {preload: path.join(__dirname, 'hud-preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false}});
   win.setMenuBarVisibility(false); hud.setVisibleOnAllWorkspaces(true, {visibleOnFullScreen: true, skipTransformProcessType: true});
-  const send = message => { if (!win.isDestroyed()) win.webContents.send('app-event', message); };
+  const send = message => { if (!win.isDestroyed()) workspace.send('app-event', message); };
   const notice = message => send({type: 'notice', message});
-  const nativeDir = app.isPackaged ? path.join(process.resourcesPath, 'native') : path.join(__dirname, '..', 'native');
+  const nativeDir = host ? path.join(host.resourceDir,'native') : app.isPackaged ? path.join(process.resourcesPath, 'native') : path.join(__dirname, '..', 'native');
   const keyboard = new Keyboard({engineDir, nativeDir, ...(options.keyboardSpawn ? {spawnProcess: options.keyboardSpawn} : {}), bindings: settings.bindings, emit: event => {
     if (event.type === 'keyboard-status') shortcutReady = event.ready;
     send(event);
   }});
-  win.on('blur', () => { if (keyboard.router.recording) { keyboard.cancelRecord(); send({type:'binding-cancelled',message:'Binding recording cancelled when MatiQ Voice lost focus.'}); } });
-  powerMonitor.on('suspend', () => keyboard.reset());
-  powerMonitor.on('lock-screen', () => keyboard.reset());
+  listen(win,'blur', () => { if (keyboard.router.recording) { keyboard.cancelRecord(); send({type:'binding-cancelled',message:'Binding recording cancelled when MatiQ Voice lost focus.'}); } });
+  listen(powerMonitor,'suspend', () => keyboard.reset());
+  listen(powerMonitor,'lock-screen', () => keyboard.reset());
   const icon = nativeImage.createFromPath(path.join(__dirname, 'ui', 'tray.png'));
   if (process.platform === 'darwin') icon.setTemplateImage(true);
-  const tray = new Tray(icon), show = () => { win.show(); win.focus(); };
+  const tray = new Tray(icon), show = () => { if(host)host.show();else{win.show();win.focus();} };
   let updateTimer, updateInterval;
-  const updates = createUpdates({updater: options.updater || (app.isPackaged ? require('electron-updater').autoUpdater : null), enabled: Boolean(options.updater) || (app.isPackaged && require('../package.json').matiqOfficialUpdates === true), isIdle: () => state === 'idle' && !activeMeeting, emit: update => { send({type: 'updates', update}); updateTray(); }});
+  const updates = host ? {
+    status: {phase:'suite',message:'Manage Voice in MatiQ Solutions → Downloads & updates.'},
+    installing:false,
+    check:async()=>updates.status,
+    install:()=>{throw Error('Restart from MatiQ Solutions when all tools have finished their work.');},
+    dispose:()=>{}
+  } : createUpdates({updater: options.updater || (app.isPackaged ? require('electron-updater').autoUpdater : null), enabled: Boolean(options.updater) || (app.isPackaged && require('../package.json').matiqOfficialUpdates === true), isIdle: () => state === 'idle' && !activeMeeting, emit: update => { send({type: 'updates', update}); updateTray(); }});
   function updateTray() {
     tray.setToolTip(`MatiQ Voice — ${state}`);
     if (process.platform === 'darwin') tray.setTitle(['recording', 'meeting-recording'].includes(state) ? '●' : ['processing', 'meeting-processing'].includes(state) ? '…' : '');
@@ -80,7 +92,7 @@ async function start(options) {
       {label: 'Copy last transcript', enabled: Boolean(lastTranscript), click: () => clipboard.writeText(lastTranscript)},
       {label: 'Settings', click: () => { show(); send({type: 'navigate', page: 'settings'}); }},
       {label: updates.status.phase === 'ready' ? 'Restart to update' : 'Check for updates', enabled: !updates.status.restartPending && (updates.status.phase === 'ready' ? state === 'idle' : !['disabled', 'checking', 'downloading'].includes(updates.status.phase)), click: () => { show(); send({type: 'navigate', page: 'settings'}); if (updates.status.phase === 'ready') { try { updates.install(); } catch (error) { notice(error.message); } } else updates.check(); }},
-      {type: 'separator'}, {label: 'Quit MatiQ Voice', click: () => app.quit()}
+      {type: 'separator'}, {label: host ? 'Close Voice' : 'Quit MatiQ Voice', click: () => host ? host.close().catch(error=>notice(error.message)) : app.quit()}
     ]));
   }
   function positionHud() {
@@ -88,8 +100,9 @@ async function start(options) {
     const [width, height] = hud.getSize();
     hud.setBounds({x: Math.round(workArea.x + (workArea.width - width) / 2), y: workArea.y + 10, width, height});
   }
-  screen.on('display-metrics-changed', () => { if (hud.isVisible()) positionHud(); });
-  screen.on('display-removed', () => { if (hud.isVisible()) positionHud(); });
+  listen(screen,'display-metrics-changed', () => { if (hud.isVisible()) positionHud(); });
+  listen(screen,'display-removed', () => { if (hud.isVisible()) positionHud(); });
+  if(!host) {
   win.on('show', () => {
     win.setSkipTaskbar(false);
     if (process.platform === 'darwin') app.dock.show().catch(error => notice(`Could not show the Dock icon: ${error.message}`));
@@ -98,6 +111,7 @@ async function start(options) {
     win.setSkipTaskbar(true);
     if (process.platform === 'darwin') app.dock.hide();
   });
+  }
   function setState(next) {
     state = next; updateTray(); send({type: 'state', state});
     if (!hud.isDestroyed()) {
@@ -105,11 +119,12 @@ async function start(options) {
       if (['preparing', 'recording', 'processing', 'meeting-preparing', 'meeting-recording', 'meeting-processing'].includes(state)) { if (!hud.isVisible()) positionHud(); hud.showInactive(); } else hud.hide();
     }
   }
-  if (process.platform === 'darwin') Menu.setApplicationMenu(Menu.buildFromTemplate([
+  if (!host && process.platform === 'darwin') Menu.setApplicationMenu(Menu.buildFromTemplate([
     {label:'MatiQ Voice',submenu:[{role:'about'},{label:'Settings…',accelerator:'Command+,',click:()=>{show();send({type:'navigate',page:'settings'});}},{type:'separator'},{role:'quit',label:'Quit MatiQ Voice'}]},
     {role:'editMenu'},{role:'windowMenu'}
   ]));
   tray.on('double-click', show); updateTray();
+  if(!host) {
   win.on('close', event => { if (!quitting) { event.preventDefault(); win.hide(); } });
   nativeUpdater.on('before-quit-for-update', () => { if (updates.installing) quitting = true; });
   app.on('activate', show); app.on('second-instance', show);
@@ -120,30 +135,31 @@ async function start(options) {
     if (awake !== null) powerSaveBlocker.stop(awake);
   });
   app.on('will-quit', () => { clearTimeout(updateTimer); clearInterval(updateInterval); updates.dispose(); keyboard.stop(); globalShortcut.unregisterAll(); });
+  }
   const isOwnFrame = frame => frame?.url === pageURL;
-  session.defaultSession.setPermissionRequestHandler((contents, permission, callback, details) => {
-    const own = contents === win.webContents && isOwnFrame(contents.mainFrame);
+  (host?.session || session.defaultSession).setPermissionRequestHandler((contents, permission, callback, details) => {
+    const own = contents === workspace && isOwnFrame(contents.mainFrame);
     const allowed = permission === 'media' && details.mediaTypes?.length && details.mediaTypes.every(type => type === 'audio' || (type === 'video' && activeMeeting));
     callback(Boolean(own && (allowed || (permission === 'display-capture' && activeMeeting))));
   });
-  session.defaultSession.setPermissionCheckHandler((contents, permission, origin, details) => Boolean(contents === win.webContents && isOwnFrame(contents.mainFrame) &&
+  (host?.session || session.defaultSession).setPermissionCheckHandler((contents, permission, origin, details) => Boolean(contents === workspace && isOwnFrame(contents.mainFrame) &&
     ((permission === 'media' && (details.mediaType === 'audio' || (details.mediaType === 'video' && activeMeeting))) || (permission === 'display-capture' && activeMeeting))));
-  session.defaultSession.setDisplayMediaRequestHandler(async (request, callback) => {
-    if (!activeMeeting || request.frame !== win.webContents.mainFrame) { callback({}); return; }
+  (host?.session || session.defaultSession).setDisplayMediaRequestHandler(async (request, callback) => {
+    if (!activeMeeting || request.frame !== workspace.mainFrame) { callback({}); return; }
     try { const sources = await desktopCapturer.getSources({types: ['screen'], thumbnailSize: {width: 0, height: 0}}); if (!sources.length) throw new Error('No screen capture source is available.'); callback({video: sources[0], audio: 'loopback'}); }
     catch (error) { notice(`Meeting audio capture failed: ${error.message}`); callback({}); }
   }, {useSystemPicker: true});
-  for (const window of [win, hud]) { window.webContents.on('will-navigate', event => event.preventDefault()); window.webContents.setWindowOpenHandler(() => ({action: 'deny'})); }
-  win.webContents.on('render-process-gone', (_, details) => {
+  for (const window of [host ? {webContents:workspace} : win, hud]) { window.webContents.on('will-navigate', event => event.preventDefault()); window.webContents.setWindowOpenHandler(() => ({action: 'deny'})); }
+  workspace.on('render-process-gone', (_, details) => {
     keyboard.cancelRecord();
     operation?.abort(); worker?.kill(); target?.cancel(); target = null; setState('idle');
     if (awake !== null) { powerSaveBlocker.stop(awake); awake = null; }
     const interrupted = activeMeeting; activeMeeting = null;
     Promise.resolve(interrupted ? meetings.stop(interrupted) : null).catch(error => dialog.showErrorBox('Meeting recovery failed', error.message));
-    dialog.showMessageBox({type: 'error', message: 'The recording window stopped.', detail: `Reason: ${details.reason}. Completed meeting chunks remain on this computer. Unsaved audio in progress was lost.`, buttons: ['Reload', 'Quit']}).then(({response}) => response === 0 ? win.reload() : app.quit());
+    dialog.showMessageBox({type: 'error', message: 'The recording window stopped.', detail: `Reason: ${details.reason}. Completed meeting chunks remain on this computer. Unsaved audio in progress was lost.`, buttons: ['Reload', 'Quit']}).then(({response}) => response === 0 ? workspace.reload() : host ? host.close().catch(error=>notice(error.message)) : app.quit());
   });
-  function handle(channel, fn) { ipcMain.handle(channel, (event, ...args) => { if (event.sender !== win.webContents || !isOwnFrame(event.senderFrame)) throw new Error('Untrusted application frame.'); return fn(...args); }); }
-  ipcMain.on('hud-action', (event, action) => { if (event.sender !== hud.webContents || event.senderFrame?.url !== hudURL) return; if (action === 'stop') send({type: activeMeeting ? 'stop-meeting' : 'toggle'}); if (action === 'cancel' && !activeMeeting) send({type: 'cancel'}); });
+  function handle(channel, fn) { if(host){host.handle(channel,fn);return;} ipcMain.handle(channel, (event, ...args) => { if (event.sender !== workspace || !isOwnFrame(event.senderFrame)) throw new Error('Untrusted application frame.'); return fn(...args); }); }
+  listen(ipcMain,'hud-action', (event, action) => { if (event.sender !== hud.webContents || event.senderFrame?.url !== hudURL) return; if (action === 'stop') send({type: activeMeeting ? 'stop-meeting' : 'toggle'}); if (action === 'cancel' && !activeMeeting) send({type: 'cancel'}); });
   handle('meter', ({level, seconds}) => { if (!Number.isFinite(level) || !Number.isFinite(seconds)) return; hud.webContents.send('hud-meter', {level: Math.min(1, Math.max(0, level)), seconds: Math.max(0, seconds)}); });
   async function ready() {
     let modelReady = false, engineReady = false, speakerReady = true;
@@ -160,7 +176,7 @@ async function start(options) {
   }
   async function input() {
     if (process.platform === 'darwin') return captureTarget(path.join(engineDir, 'mac-input'), ['session']);
-    const script = app.isPackaged ? path.join(process.resourcesPath, 'native', 'windows-input.ps1') : path.join(__dirname, '..', 'native', 'windows-input.ps1');
+    const script = path.join(nativeDir,'windows-input.ps1');
     return captureTarget('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', script, '-Action', 'session']);
   }
   async function recognize() {
@@ -177,7 +193,7 @@ async function start(options) {
   }
   handle('update-check', () => updates.check());
   handle('update-install', () => updates.install());
-  handle('status', async () => ({updates: updates.status, state, settings, models: MODELS, maxSeconds: MAX_SECONDS, lastTranscript, canRetry: Boolean(lastAudio), shortcutReady, keyboardError: keyboard.error, startupNotice, platform: process.platform, packaged: app.isPackaged, installation:{version:app.getVersion(),path:app.isPackaged?app.getPath('exe'):app.getAppPath()},
+  handle('status', async () => ({updates: updates.status, state, settings, models: MODELS, maxSeconds: MAX_SECONDS, lastTranscript, canRetry: Boolean(lastAudio), shortcutReady, keyboardError: keyboard.error, startupNotice, platform: process.platform, packaged: app.isPackaged, hosted:Boolean(host),applicationName:app.getName(),installation:{version:host?.manifest.version||app.getVersion(),path:app.isPackaged?app.getPath('exe'):app.getAppPath()},
     hardware, setup, sharedModels, familyModelRoot, permissions: await permissionStatus(), connections: await connections.status(), activeMeeting, ...(await ready())}));
   handle('settings', async value => {
     if (state !== 'idle' || savingSettings) throw new Error('Wait for the current operation or preference save to finish.');
@@ -203,7 +219,7 @@ async function start(options) {
   handle('keyboard-enable', async () => {
     if (process.platform === 'darwin' && !(await readPasteAccess(path.join(engineDir,'mac-input'),{request:true})).accessibility) {
       await shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility');
-      notice('Turn on MatiQ Voice in Accessibility, then return and click Check keyboard access again. Use Show app in Finder to locate the installed app for the + picker.');
+      notice(`Turn on ${app.getName()} in Accessibility, then return and click Check keyboard access again. Use Show app in Finder to locate the installed app for the + picker.`);
       return {ready:false};
     }
     try { await keyboard.start({requestAccess:true}); }
@@ -312,13 +328,38 @@ async function start(options) {
     const text = [`# ${meeting.title}`, '', '## Transcript', ...meeting.segments.map(segment => `${Math.floor(segment.startMs / 60000)}:${String(Math.floor(segment.startMs / 1000) % 60).padStart(2, '0')} ${meeting.speakers[segment.speaker] || 'Unassigned'}: ${segment.text}`), '', '## Personal notes', meeting.personalNotes, '', '## Extracted notes', ...(meeting.notes?.actions || []).map(note => `- ${note.text} [${Math.floor(note.startMs / 1000)}s]`) ].join('\n');
     await fs.writeFile(result.filePath, text, {mode: 0o600}); return true;
   });
-  handle('quit', () => app.quit());
+  handle('quit', () => host ? host.close() : app.quit());
   try { await keyboard.start(); } catch (error) { startupNotice += ` ${error.message}`; }
   if (!globalShortcut.register('CommandOrControl+Alt+Backspace', () => send({type: 'cancel'}))) startupNotice += ' The cancel shortcut is unavailable. Use the app controls.';
-  await hud.loadURL(hudURL); await win.loadURL(pageURL);
-  updateTimer = setTimeout(() => updates.check(), 15000); updateTimer.unref();
-  updateInterval = setInterval(() => updates.check(), 6 * 60 * 60 * 1000); updateInterval.unref();
+  async function dispose(){
+      clearTimeout(updateTimer);clearInterval(updateInterval);updates.dispose();
+      for(const [emitter,event,fn] of listeners)emitter.removeListener(event,fn);
+      for(const provider of ['microsoft','google'])connections.cancel(provider);
+      operation?.abort();target?.cancel();
+      for(const child of [keyboard.child,worker].filter(Boolean))ownedChildren.add(watch(child));
+      const stopped=[...ownedChildren].map(child=>waitForExit(child));
+      for(const child of ownedChildren)if(child!==keyboard.child&&child!==worker&&!hasExited(child))child.kill();
+      keyboard.stop();worker?.kill();await Promise.all(stopped);ownedChildren.clear();
+      globalShortcut.unregister('CommandOrControl+Alt+Backspace');
+      if(awake!==null)powerSaveBlocker.stop(awake);
+      hud.destroy();tray.destroy();
+  }
+  try {
+  await hud.loadURL(hudURL); await workspace.loadURL(pageURL);
+  if(!host){updateTimer = setTimeout(() => updates.check(), 15000); updateTimer.unref();
+  updateInterval = setInterval(() => updates.check(), 6 * 60 * 60 * 1000); updateInterval.unref();}
   show();
+  } catch(error){await dispose();throw error;}
+  return {
+    status:async()=>{
+      const busy=()=>state!=='idle'||Boolean(activeMeeting||operation||lastAudio||savingSettings||connections.pending.size||keyboard.router.recording);
+      if(busy())return {busy:true,background:true,reason:state!=='idle'?state:lastAudio?'retry or clear retained audio':'finish pending work'};
+      const editing=await workspace.executeJavaScript("Boolean([...document.querySelectorAll('#personal-notes,.speaker-row input')].some(input=>input.value!==input.defaultValue)||document.querySelector('#binding-dialog[open]'))");
+      return {busy:busy()||editing,background:true,reason:editing?'save your meeting notes, speaker names or binding first':'finish pending work'};
+    },
+    onVisibility:visible=>{if(!visible&&keyboard.router.recording){keyboard.cancelRecord();send({type:'binding-cancelled',message:'Binding recording cancelled when you left Voice.'});}},
+    dispose
+  };
 }
-if (require.main === module) launch();
-module.exports = {launch};
+if (app.getAppPath() === path.resolve(__dirname,'..')) launch();
+module.exports = {launch,start};

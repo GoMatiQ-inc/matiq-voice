@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "id": "com.matiq.voice",
+  "name": "MatiQ Voice",
+  "description": "Local dictation and meeting notes, with speech kept on your device.",
+  "version": "0.3.10",
+  "sdk": 1,
+  "dataVersion": 1,
+  "runtime": "electron-45.2.3",
+  "targets": [
+    "darwin-arm64",
+    "darwin-x64",
+    "win32-x64",
+    "win32-arm64",
+    "linux-x64"
+  ],
+  "capabilities": [
+    "microphone",
+    "system-audio",
+    "keyboard",
+    "clipboard",
+    "files",
+    "network"
+  ],
+  "adapter": "src/suite.cjs",
+  "workspace": "src/ui/index.html",
+  "preload": "src/preload.cjs"
+}
