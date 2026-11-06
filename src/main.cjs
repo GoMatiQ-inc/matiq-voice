@@ -5,7 +5,8 @@ const {pathToFileURL} = require('node:url');
 const {MODELS, DEFAULT_SETTINGS, MAX_SECONDS, validateSettings, validateWav} = require('./core.cjs');
 const {transcribe} = require('./engine.cjs');
 const {inspectHardware} = require('./hardware.cjs');
-const {SPEAKER_MODELS, downloadAsset} = require('./assets.cjs');
+const {SPEAKER_MODELS,verifyAsset} = require('./assets.cjs');
+const {sharedRoot,speechAsset,sharedDownloadAsset,adoptExistingAssets} = require('./shared-models.cjs');
 const {EncryptedTokenStore, Connections, meetingURL} = require('./oauth.cjs');
 const {MeetingStore} = require('./meetings.cjs');
 const {captureTarget,readPasteAccess} = require('./input.cjs');
@@ -33,6 +34,11 @@ async function start(options) {
   let setup = {completed: false, microphoneTested: false, permissionsReviewed: false, launchAtLogin: false};
   try { setup = {...setup, ...JSON.parse(await fs.readFile(setupFile, 'utf8'))}; }
   catch (error) { if (error.code !== 'ENOENT') startupNotice += ' Setup progress was damaged; complete setup again.'; }
+  const familyModelRoot = options.sharedModelRoot || sharedRoot();
+  let sharedModels = [];
+  try { sharedModels = await adoptExistingAssets([...Object.keys(MODELS).map(speechAsset),...SPEAKER_MODELS],modelDir,familyModelRoot); }
+  catch(error) { startupNotice += ` Model sharing could not finish: ${error.message}`; }
+  const downloadAsset = (asset,directory,progress,signal) => sharedDownloadAsset(asset,directory,progress,signal,familyModelRoot);
   const saveJSON = async (filename, value) => { await fs.writeFile(`${filename}.tmp`, JSON.stringify(value, null, 2), {mode: 0o600}); await fs.rename(`${filename}.tmp`, filename); };
   let oauthConfig = options.oauthConfig || {};
   if (!options.oauthConfig) {
@@ -141,9 +147,9 @@ async function start(options) {
   handle('meter', ({level, seconds}) => { if (!Number.isFinite(level) || !Number.isFinite(seconds)) return; hud.webContents.send('hud-meter', {level: Math.min(1, Math.max(0, level)), seconds: Math.max(0, seconds)}); });
   async function ready() {
     let modelReady = false, engineReady = false, speakerReady = true;
-    try { modelReady = (await fs.stat(path.join(modelDir, `ggml-${settings.model}.bin`))).size === MODELS[settings.model].bytes; } catch (error) { if (error.code !== 'ENOENT') throw error; }
+    modelReady = await verifyAsset(path.join(modelDir,`ggml-${settings.model}.bin`),speechAsset(settings.model));
     try { await fs.access(binary); engineReady = hardware.engineCompatible; } catch (error) { if (error.code !== 'ENOENT') throw error; }
-    for (const asset of SPEAKER_MODELS) { try { if ((await fs.stat(path.join(modelDir, asset.file))).size !== asset.bytes) speakerReady = false; } catch (error) { if (error.code !== 'ENOENT') throw error; speakerReady = false; } }
+    for (const asset of SPEAKER_MODELS) if(!await verifyAsset(path.join(modelDir,asset.file),asset)) speakerReady=false;
     return {modelReady, engineReady, speakerReady};
   }
   async function permissionStatus() {
@@ -172,7 +178,7 @@ async function start(options) {
   handle('update-check', () => updates.check());
   handle('update-install', () => updates.install());
   handle('status', async () => ({updates: updates.status, state, settings, models: MODELS, maxSeconds: MAX_SECONDS, lastTranscript, canRetry: Boolean(lastAudio), shortcutReady, keyboardError: keyboard.error, startupNotice, platform: process.platform, packaged: app.isPackaged, installation:{version:app.getVersion(),path:app.isPackaged?app.getPath('exe'):app.getAppPath()},
-    hardware, setup, permissions: await permissionStatus(), connections: await connections.status(), activeMeeting, ...(await ready())}));
+    hardware, setup, sharedModels, familyModelRoot, permissions: await permissionStatus(), connections: await connections.status(), activeMeeting, ...(await ready())}));
   handle('settings', async value => {
     if (state !== 'idle' || savingSettings) throw new Error('Wait for the current operation or preference save to finish.');
     savingSettings = true;
@@ -214,8 +220,8 @@ async function start(options) {
     if (updates.installing) throw new Error('MatiQ Voice is restarting to update.');
     if (state !== 'idle') throw new Error('Finish the current operation first.');
     operation = new AbortController(); setState('downloading');
-    const speech = {...MODELS[settings.model], file: `ggml-${settings.model}.bin`, url: `https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-${settings.model}.bin`};
-    try { const assets = [speech, ...SPEAKER_MODELS]; for (let i = 0; i < assets.length; i++) await (options.downloadAsset || downloadAsset)(assets[i], modelDir, percent => send({type: 'download', percent, file: assets[i].file, overall: Math.round((i * 100 + percent) / assets.length)}), operation.signal); notice('Speech and speaker models verified. They can run offline.'); }
+    const speech = speechAsset(settings.model);
+    try { const assets = [speech, ...SPEAKER_MODELS]; for (let i = 0; i < assets.length; i++) await (options.downloadAsset || downloadAsset)(assets[i], modelDir, percent => send({type: 'download', percent, file: assets[i].file, overall: Math.round((i * 100 + percent) / assets.length)}), operation.signal); sharedModels = await adoptExistingAssets(assets,modelDir,familyModelRoot); notice('Speech and speaker models verified. They can run offline.'); }
     finally { operation = null; setState('idle'); }
     return ready();
   });
