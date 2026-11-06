@@ -364,3 +364,20 @@ The isolated profile/cache is removed, clipboard text restored, and the owned
 app process plus two captured inspector listeners are independently absent.
 Cold editor activation/overlay cases run only on Mac; Windows retains its
 established renderer accessibility setup and native caret insertion checks.
+
+## Background recording clock (0.3.11 candidate)
+
+A native Mac reproduction entered recording but stayed at 0:00 after Chromium
+reported an output-device error and suspended its AudioContext. Capture now uses
+a silent output sink because dictation requires no speaker playback. Startup
+waits for the first PCM frame; a worklet delivering no samples fails visibly
+after five seconds and releases its stream and audio context.
+
+The native capture regression passes on Mac in an untouched hidden window,
+without a user gesture or autoplay override. It checks elapsed audio, retained
+WAV length, a separate known oscillator signal, and stalled-worklet cleanup.
+The original full-app cold background shortcut reproduction also advances its
+timer with the fix. Test input is synthetic; this does not by itself qualify
+physical microphone routing or the installed app. Owned fixture processes and
+captured inspector listeners are independently absent after exit. The capture
+check runs in both native CI jobs; the older full E2E autoplay override is removed.

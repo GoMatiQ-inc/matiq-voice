@@ -39,6 +39,8 @@ jobs:
           MATIQ_GOOGLE_CLIENT_ID: ${{ vars.MATIQ_GOOGLE_CLIENT_ID }}
           MATIQ_GOOGLE_DESKTOP_CLIENT_SECRET: ${{ secrets.MATIQ_GOOGLE_DESKTOP_CLIENT_SECRET }}
       - run: npm test
+      - name: Verify cold background capture and stalled-start cleanup
+        run: npm run test:capture
       - name: Parse Windows signing verifier
         if: runner.os == 'Windows'
         shell: pwsh

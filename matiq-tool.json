@@ -3,7 +3,7 @@
   "id": "com.matiq.voice",
   "name": "MatiQ Voice",
   "description": "Local dictation and meeting notes, with speech kept on your device.",
-  "version": "0.3.10",
+  "version": "0.3.11",
   "sdk": 1,
   "dataVersion": 1,
   "runtime": "electron-45.2.3",

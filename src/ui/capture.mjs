@@ -2,7 +2,7 @@ import {encodeWav} from './audio.mjs';
 
 export async function captureAudio(stream, {onLevel = () => {}, onError = () => {}, onLimit = () => {}, onChunk = null, chunkSeconds = 30, maxSeconds = 300} = {}) {
   if (!stream.getAudioTracks().length) { stream.getTracks().forEach(track => track.stop()); throw new Error('The selected source has no audio track. Choose a source with meeting audio.'); }
-  const context = new AudioContext({sampleRate: 16000});
+  const context = new AudioContext({sampleRate: 16000, sinkId: {type: 'none'}});
   let node, source;
   try {
     await context.audioWorklet.addModule('recorder-worklet.js'); await context.resume();
@@ -10,6 +10,7 @@ export async function captureAudio(stream, {onLevel = () => {}, onError = () => 
     source = context.createMediaStreamSource(stream); node = new AudioWorkletNode(context, 'matiq-recorder');
   } catch (error) { stream.getTracks().forEach(track => track.stop()); await context.close(); throw error; }
   let chunks = [], count = 0, total = 0, sequence = 0, pending = Promise.resolve(), failure = null, closed = false, stopping = null, lastMeter = 0;
+  let resolveStarted; const firstFrame = new Promise(resolve => { resolveStarted = resolve; });
   let commandNumber = 0; const acknowledgements = new Map();
   function flush() {
     if (!count) return;
@@ -32,13 +33,22 @@ export async function captureAudio(stream, {onLevel = () => {}, onError = () => 
     const samples = data.samples.subarray(0, Math.max(0, maxSeconds * 16000 - total));
     if (!samples.length) return;
     chunks.push(samples); count += samples.length; total += samples.length;
+    resolveStarted?.(); resolveStarted = null;
     const now = performance.now();
     if (now - lastMeter > 100) { lastMeter = now; onLevel(Math.min(1, Math.sqrt(samples.reduce((sum, sample) => sum + sample * sample, 0) / samples.length) * 4), total / 16000); }
     if (onChunk && count >= chunkSeconds * 16000) flush();
     if (total >= maxSeconds * 16000) onLimit();
   };
   stream.getAudioTracks()[0].onended = () => { if (!closed && !stopping) onError(new Error('An audio source disconnected. Completed audio chunks are retained.')); };
-  source.connect(node); node.connect(context.destination);
+  let startupTimer;
+  try {
+    source.connect(node); node.connect(context.destination);
+    await Promise.race([firstFrame, new Promise((_, reject) => {
+      startupTimer = setTimeout(() => reject(new Error('Audio capture did not start. Check the selected microphone and try again.')), 5000);
+    })]);
+  } catch (error) {
+    closed = true; stream.getTracks().forEach(track => track.stop()); source.disconnect(); node.disconnect(); await context.close(); throw error;
+  } finally { clearTimeout(startupTimer); }
   return {
     get seconds() { return total / 16000; },
     async pause(paused) { await command({command: 'pause', paused}); if (onChunk) { flush(); await pending; if (failure) throw failure; } },
