@@ -19,14 +19,14 @@ async function combine(directory, chunks, channel) {
   } finally { await handle.close(); }
   return file;
 }
-async function analyze(job) {
+async function analyze(job,{runEngine=run}={}) {
   const meeting = JSON.parse(await fs.readFile(path.join(job.directory, 'meeting.json'), 'utf8'));
   const segments = []; const speakers = {microphone: 'Microphone', unknown: 'Unassigned'};
   for (const channel of ['microphone', 'system']) {
     const audio = await combine(job.directory, meeting.chunks, channel);
     if (!audio) continue;
     const output = path.join(job.directory, `${channel}-recognition`);
-    await run(job.binary, ['--model', job.model, '--file', audio, '--language', 'en', '--output-json', '--output-file', output, '--max-len', '96', '--split-on-word'], {timeout: 4 * 3600000});
+    await runEngine(job.binary, ['--model', job.model, '--file', audio, '--language', 'en', '--output-json', '--output-file', output, '--max-len', '96', '--split-on-word'], {timeout: 4 * 3600000});
     const result = JSON.parse(await fs.readFile(`${output}.json`, 'utf8'));
     let turns = [];
     if (channel === 'system') {
@@ -51,7 +51,21 @@ async function analyze(job) {
   segments.sort((a, b) => a.startMs - b.startMs || a.channel.localeCompare(b.channel));
   return {segments, speakers, notes: sourceNotes(segments)};
 }
-if (process.parentPort) process.parentPort.once('message', ({data}) => {
-  analyze(data).then(result => process.parentPort.postMessage({ok: true, result})).catch(error => process.parentPort.postMessage({ok: false, error: `Meeting processing failed: ${error.message}. Recorded audio is retained; retry processing.`}));
-});
+if (process.parentPort) {
+  const pending=new Map();let nextRequest=0,started=false;
+  process.parentPort.on('message',({data})=>{
+    if(data.type==='engine-result'){
+      const request=pending.get(data.requestId);if(!request)return;pending.delete(data.requestId);
+      data.ok?request.resolve(data.output):request.reject(new Error(data.error));return;
+    }
+    if(started)throw Error('Meeting worker received a duplicate processing job.');started=true;
+    // The parent owns external processes, including their actual exit. Keep
+    // only CPU-heavy diarization and local result assembly in this worker.
+    const runEngine=(_binary,args)=>new Promise((resolve,reject)=>{
+      const requestId=++nextRequest;pending.set(requestId,{resolve,reject});
+      process.parentPort.postMessage({type:'engine-run',requestId,args});
+    });
+    analyze(data,{runEngine}).then(result=>process.parentPort.postMessage({ok:true,result})).catch(error=>process.parentPort.postMessage({ok:false,error:`Meeting processing failed: ${error.message}. Recorded audio is retained; retry processing.`}));
+  });
+}
 module.exports = {combine, analyze};

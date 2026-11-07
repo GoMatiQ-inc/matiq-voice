@@ -3,7 +3,7 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const {pathToFileURL} = require('node:url');
 const {MODELS, DEFAULT_SETTINGS, MAX_SECONDS, validateSettings, validateWav} = require('./core.cjs');
-const {transcribe} = require('./engine.cjs');
+const {transcribe,run} = require('./engine.cjs');
 const {inspectHardware} = require('./hardware.cjs');
 const {SPEAKER_MODELS,verifyAsset} = require('./assets.cjs');
 const {sharedRoot,speechAsset,sharedDownloadAsset,adoptExistingAssets} = require('./shared-models.cjs');
@@ -194,7 +194,7 @@ async function start(options) {
   async function recognize() {
     const controller = new AbortController(); operation = controller; setState('processing');
     try {
-      const text = await transcribe({binary, model: path.join(modelDir, `ggml-${settings.model}.bin`), audio: lastAudio, directory: jobsDir, signal: controller.signal});
+      const text = await transcribe({binary, model: path.join(modelDir, `ggml-${settings.model}.bin`), audio: lastAudio, directory: jobsDir, signal: controller.signal,onSpawn:trackChild});
       if (controller.signal.aborted) return;
       lastTranscript = text; lastAudio = null; send({type: 'transcript', text}); updateTray();
       if (!text) { notice('The recognizer returned no words. Try closer to the microphone.'); return; }
@@ -283,7 +283,7 @@ async function start(options) {
   handle('recording-ready', () => { if (state !== 'preparing') throw new Error('Recording was cancelled.'); setState('recording'); });
   handle('transcribe', async wav => { if (state !== 'recording') throw new Error('Start recording before submitting audio.'); try { lastAudio = validateWav(wav); } catch (error) { setState('idle'); throw error; } return recognize(); });
   handle('retry', () => { if (state !== 'idle' || !lastAudio) throw new Error('No failed recording is available.'); target = null; return recognize(); });
-  handle('cancel', () => { generation++; if (activeMeeting && state !== 'meeting-processing') throw new Error('Stop meeting recording to save its audio.'); if (operation) { setState('cancelling'); operation.abort(); } else if (worker) worker.kill(); else setState('idle'); lastAudio = null; target?.cancel(); target = null; });
+  handle('cancel', () => { generation++; if (activeMeeting && state !== 'meeting-processing') throw new Error('Stop meeting recording to save its audio.'); if (operation) { setState('cancelling'); operation.abort();worker?.kill(); } else if (worker) worker.kill(); else setState('idle'); lastAudio = null; target?.cancel(); target = null; });
   handle('copy', () => { if (!lastTranscript) throw new Error('No transcript is available.'); clipboard.writeText(lastTranscript); });
   handle('clear', () => { if (state !== 'idle') throw new Error('Finish the current operation before clearing.'); lastTranscript = ''; lastAudio = null; send({type: 'transcript', text: ''}); updateTray(); });
   handle('accessibility', async () => { if (process.platform === 'darwin') { await readPasteAccess(path.join(engineDir,'mac-input'),{request:true}); await shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility'); } else notice('Windows can reject insertion into elevated or protected apps. Use Copy when necessary.'); });
@@ -319,16 +319,27 @@ async function start(options) {
     if (state !== 'idle') throw new Error('Finish recording before processing a meeting.');
     const meeting = await meetings.get(id); if (!meeting.chunks.length) throw new Error('This meeting has no saved audio.');
     meeting.status = 'processing'; meeting.error = ''; await meetings.write(meeting); activeMeeting = id; setState('meeting-processing');
+    const controller=new AbortController(),engineJobs=new Set();operation=controller;
     try {
       const result = await new Promise((resolve, reject) => {
         worker = trackChild(utilityProcess.fork(path.join(__dirname, 'meeting-worker.cjs'), [], {serviceName: 'MatiQ Voice local meeting processing', stdio: 'pipe'}));
-        worker.once('message', message => message.ok ? resolve(message.result) : reject(new Error(message.error)));
-        worker.once('exit', code => reject(new Error(`Meeting worker stopped (${code}). Audio is retained; retry processing.`)));
-        worker.once('spawn', () => worker.postMessage({directory: meetings.folder(id), binary, model: path.join(modelDir, `ggml-${settings.model}.bin`), models: modelDir}));
+        const child=worker;
+        child.on('message',message=>{
+          if(message.type!=='engine-run'){message.ok?resolve(message.result):reject(new Error(message.error));return;}
+          const job=(async()=>{
+            let reply;
+            try{const output=await run(binary,message.args,{timeout:4*3600000,signal:controller.signal,onSpawn:trackChild});reply={ok:true,output};}
+            catch(error){reply={ok:false,error:error.message};}
+            if(!hasExited(child))child.postMessage({type:'engine-result',requestId:message.requestId,...reply});
+          })();
+          engineJobs.add(job);job.catch(reject).finally(()=>engineJobs.delete(job));
+        });
+        child.once('exit', code => reject(new Error(`Meeting worker stopped (${code}). Audio is retained; retry processing.`)));
+        child.once('spawn', () => child.postMessage({directory: meetings.folder(id), binary, model: path.join(modelDir, `ggml-${settings.model}.bin`), models: modelDir}));
       });
       Object.assign(meeting, result, {status: 'ready'}); await meetings.write(meeting); return meeting;
     } catch (error) { meeting.status = 'error'; meeting.error = error.message; await meetings.write(meeting); throw error; }
-    finally { worker?.kill(); worker = null; activeMeeting = null; setState('idle'); }
+    finally { controller.abort();await Promise.allSettled([...engineJobs]);worker?.kill(); worker = null;operation=null; activeMeeting = null; setState('idle'); }
   });
   handle('meeting-speaker', (id, speaker, name) => meetings.renameSpeaker(id, speaker, name));
   handle('meeting-notes', (id, text) => meetings.setNotes(id, text));
