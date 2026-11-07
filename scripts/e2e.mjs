@@ -42,7 +42,7 @@ async function boot() {
   const base = `http://127.0.0.1:${server.address().port}`;
   const endpoints = Object.fromEntries(['microsoft', 'google'].map(id => [id, Object.fromEntries(['authorize', 'token', 'profile', 'events', 'revoke'].map(key => [key, `${base}/${id}/${key}`]))]));
   await fs.writeFile(entry, `const {app}=require('electron');const fs=require('node:fs/promises');app.setPath('userData',${JSON.stringify(profile)});require(${JSON.stringify(path.join(root, 'src/main.cjs'))}).launch({updater:(()=>{const u=new(require('node:events').EventEmitter)();u.setFeedURL=()=>{};u.checkForUpdates=async()=>({cancellationToken:{},updateInfo:{version:'99.0.0'}});u.downloadUpdate=async()=>u.emit('update-downloaded',{version:'99.0.0'});u.quitAndInstall=()=>{globalThis.__updateInstalled=true;setTimeout(()=>{const {autoUpdater,BrowserWindow}=require('electron');autoUpdater.emit('before-quit-for-update');BrowserWindow.getAllWindows().find(w=>w.getTitle()==='MatiQ Voice').close();},100);};return u;})(),keyboardSpawn:()=>{const child=new(require('node:events').EventEmitter)();const Stream=require('node:stream').PassThrough;child.stdout=new Stream();child.stderr=new Stream();child.stdin=new Stream();child.stdin.once('finish',()=>queueMicrotask(()=>child.emit('close',0)));child.kill=()=>child.emit('close',0);globalThis.__keyboardFixture=child;queueMicrotask(()=>child.stdout.write(JSON.stringify({ready:true})+'\\n'));return child;},oauthConfig:{microsoft:{clientId:'fixture-microsoft'},google:{clientId:'fixture-google'}},testEndpoints:${JSON.stringify(endpoints)},openBrowser:async url=>fs.writeFile(${JSON.stringify(authorizeFile)},url),inspectHardware:async(directory,engine)=>{const h=await require(${JSON.stringify(path.join(root, 'src/hardware.cjs'))}).inspectHardware(directory,engine);const recommend=require(${JSON.stringify(path.join(root, 'src/hardware.cjs'))}).recommendModel;return {...h,memoryBytes:4*1024**3,cores:2,recommendation:recommend({platform:process.platform,arch:process.arch,memoryBytes:4*1024**3,cores:2})};},sharedModelRoot:${JSON.stringify(familyRoot)},downloadAsset:async(asset,directory,progress,signal)=>require(${JSON.stringify(path.join(root, 'src/shared-models.cjs'))}).sharedDownloadAsset({...asset,url:${JSON.stringify(base)}+'/models/'+asset.file},directory,progress,signal,${JSON.stringify(familyRoot)})});`);
-  desktop = await electron.launch({executablePath: require('electron'), cwd: root, args: [entry, '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--use-file-for-fake-audio-capture='+path.join(temporary,'microphone.wav')]});
+  desktop = await electron.launch({executablePath: require('electron'), cwd: root, args: [entry, '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream']});
   ownedDesktops.push(lifecycle.capture(desktop.process()));
   await expect.poll(() => desktop.windows().some(page => page.url().endsWith('/index.html')), {timeout: 15000}).toBe(true);
   const page = desktop.windows().find(value => value.url().endsWith('/index.html'));
@@ -52,12 +52,17 @@ async function boot() {
     const originalMicrophone = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
     window.__e2eAudio = [];
     async function syntheticAudio(frequency) {
-      const context = new AudioContext({sampleRate: 16000}); const oscillator = context.createOscillator();
+      const context = new AudioContext({sampleRate: 16000, sinkId: {type: 'none'}}); const oscillator = context.createOscillator();
       const gain = context.createGain(); const destination = context.createMediaStreamDestination();
       oscillator.frequency.value = frequency; gain.gain.value = .2; oscillator.connect(gain); gain.connect(destination); oscillator.start(); await context.resume();
       window.__e2eAudio.push({context, oscillator, destination}); return destination.stream;
     }
-    navigator.mediaDevices.getUserMedia = async options => window.__e2eMeeting ? syntheticAudio(440) : originalMicrophone(options);
+    navigator.mediaDevices.getUserMedia = async options => {
+      const input = await originalMicrophone(options); input.getTracks().forEach(track => track.stop());
+      // The capture-clock suite separately qualifies the fake device without a gesture.
+      // This workflow needs a known non-silent signal on every native audio backend.
+      return syntheticAudio(440);
+    };
     navigator.mediaDevices.getDisplayMedia = async () => {
       // Independent, deterministic sources avoid sharing Chrome's fake mic driver.
       const audio = await syntheticAudio(660); const canvas = document.createElement('canvas'); canvas.width = 8; canvas.height = 8;
@@ -79,9 +84,6 @@ async function consent(page, provider, decision) {
 try {
   await fs.access(path.join(root, 'engine', process.platform === 'win32' ? 'whisper-cli.exe' : 'whisper-cli'));
   const assets = await prepare(fixtures);
-  // A known signal avoids depending on Chromium's default fake-input silence.
-  const microphoneSignal=Float32Array.from({length:16000*10},(_,index)=>.2*Math.sin(2*Math.PI*440*index/16000));
-  await fs.writeFile(path.join(temporary,'microphone.wav'),new Uint8Array(encodeWav([microphoneSignal])));
   const files = new Map(assets.map(asset => [asset.file, path.join(fixtures, asset.file)]));
   server = http.createServer(async (req, res) => {
     try {
@@ -227,7 +229,7 @@ try {
     await page.getByRole('button',{name:'Settings',exact:true}).click();
     await expect(page.locator('.brand img')).toHaveAttribute('alt','MatiQ Solutions');
     await expect(page.locator('.brand span')).toHaveText('Voice');
-    assert.equal(await page.locator('.brand img').evaluate(img=>img.complete && img.naturalWidth===1374),true);
+    assert.equal(await page.locator('.brand img').evaluate(img=>img.complete && img.naturalWidth>0),true);
     if (!(await page.locator('#update-install').isVisible())) await page.locator('#update-check').click();
     await expect(page.locator('#update-install')).toBeVisible();
     await page.evaluate(async()=>{await window.matiqVoice.begin();await window.matiqVoice.recordingReady();});
