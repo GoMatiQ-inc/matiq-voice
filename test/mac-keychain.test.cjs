@@ -53,6 +53,7 @@ test('packager rejection exits nonzero even when an SDK exit hook resets exitCod
     Module._load = function(name) {
       if (name === 'node:fs') return {...fs, existsSync: () => true, readFileSync: (filename, ...args) => String(filename).endsWith('config/oauth.json') ? JSON.stringify({microsoft:{clientId:'00000000-0000-0000-0000-000000000001'},google:{clientId:'fixture.apps.googleusercontent.com'}}) : fs.readFileSync(filename, ...args)};
       if (name === './mac-keychain.cjs') return {withMacKeychain: (env, operation) => operation()};
+      if (name === '@matiq-solutions/sdk/notary-profile.cjs') return {withNotaryProfile: (env, operation) => operation()};
       if (name === 'electron-builder') return {build: async () => { throw new Error('fixture signing failed'); }};
       return load.apply(this, arguments);
     };

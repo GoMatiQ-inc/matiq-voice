@@ -45,6 +45,7 @@ function paint() {
 }
 async function refresh() {
   snapshot = await api.status(); state = snapshot.state; paint();
+  if(snapshot.hosted) $('keyboard-permission-help').textContent = $('keyboard-permission-help').textContent.replaceAll('MatiQ Voice',snapshot.applicationName);
   renderConnections($('connections')); $('hardware-settings').innerHTML = deviceHTML();
 }
 function bindingLabel(keys) {
@@ -198,7 +199,7 @@ function renderMeeting() {
     const speakers = document.createElement('div'); speakers.className = 'speaker-list'; speakers.innerHTML = '<h3>Speaker labels</h3><p class="caption">Voice grouping does not identify a person. Assign names only when you know the speaker.</p>';
     for (const [key, name] of Object.entries(meeting.speakers)) {
       const row = document.createElement('div'); row.className = 'speaker-row'; const label = document.createElement('label'); const input = document.createElement('input'); const save = document.createElement('button');
-      input.id = `speaker-${key}`; input.value = name; input.maxLength = 80; label.htmlFor = input.id; label.textContent = name; save.textContent = 'Save name';
+      input.id = `speaker-${key}`; input.value = name; input.defaultValue = name; input.maxLength = 80; label.htmlFor = input.id; label.textContent = name; save.textContent = 'Save name';
       save.onclick = async () => { try { selectedMeeting = await api.renameSpeaker(meeting.id, key, input.value); renderMeeting(); } catch (error) { showError(error); } }; row.append(label, input, save); speakers.append(row);
     }
     content.append(speakers);
@@ -210,7 +211,7 @@ function renderMeeting() {
       if (!notes.length) { const empty = document.createElement('p'); empty.className = 'caption'; empty.textContent = 'No matching passages extracted. Add your own notes below.'; content.append(empty); }
       for (const note of notes) { const row = document.createElement('div'); row.className = 'note-item'; const text = document.createElement('p'); text.textContent = note.text; const link = document.createElement('button'); link.textContent = `View transcript · ${formatTime(note.startMs / 1000)}`; link.onclick = () => { meetingTab = 'transcript'; renderMeeting(); const turn = document.getElementById(`turn-${note.sourceId}`); turn?.scrollIntoView({block: 'center'}); turn?.focus(); }; row.append(text, link); content.append(row); }
     }
-    const label = document.createElement('label'); label.htmlFor = 'personal-notes'; label.textContent = 'Your notes'; const notes = document.createElement('textarea'); notes.id = 'personal-notes'; notes.value = meeting.personalNotes || ''; const save = document.createElement('button'); save.textContent = 'Save notes'; save.onclick = async () => { try { selectedMeeting = await api.saveNotes(meeting.id, notes.value); message('Meeting notes saved on this computer.'); } catch (error) { showError(error); } }; content.append(label, notes, save);
+    const label = document.createElement('label'); label.htmlFor = 'personal-notes'; label.textContent = 'Your notes'; const notes = document.createElement('textarea'); notes.id = 'personal-notes'; notes.value = meeting.personalNotes || ''; notes.defaultValue = notes.value; const save = document.createElement('button'); save.textContent = 'Save notes'; save.onclick = async () => { try { const saved = notes.value; selectedMeeting = await api.saveNotes(meeting.id, saved); notes.defaultValue = saved; message(notes.value === saved ? 'Meeting notes saved on this computer.' : 'Prior notes saved. Your newer edits are still unsaved.'); } catch (error) { showError(error); } }; content.append(label, notes, save);
   }
 }
 function openMeetingDialog(event = null) {

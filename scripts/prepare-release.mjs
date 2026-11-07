@@ -11,7 +11,8 @@ export async function prepareRelease({version, tag, directory, signed = false}) 
   const reports = signed ? ['mac-signature.json', 'windows-signature.json'] : [];
   const updates = signed ? [`MatiQ-Voice-${version}-mac-arm64.zip`, 'latest-mac.yml', 'latest.yml'] : [];
   const optional = signed ? [`MatiQ-Voice-${version}-mac-arm64.zip.blockmap`, `MatiQ-Voice-${version}-windows-x64.exe.blockmap`] : [];
-  const expected = [...names, ...reports, ...updates];
+  const toolTargets=signed?['darwin-arm64','win32-x64']:[],toolReports=toolTargets.map(target=>`suite-proof-${target}.json`),toolAssets=toolTargets.flatMap(target=>{const name=`MatiQ-Voice-${version}-${target}.mqt`;return [name,name+'.release.json'];});
+  const expected = [...names, ...reports, ...updates,...toolReports,...toolAssets];
   const files = await readdir(directory);
   if (expected.some(file => !files.includes(file)) || files.some(file => !expected.includes(file) && !optional.includes(file))) throw new Error('Provide exactly the tested Mac arm64 PKG and Windows x64 EXE, plus native verification reports for signed releases. Do not publish debug profiles, logs or other files.');
   const checksums = [];
@@ -36,6 +37,11 @@ export async function prepareRelease({version, tag, directory, signed = false}) 
       checksums.push(`${digest}  ${name}`);
     }
   }
+  for(const target of toolTargets){
+    const proof=JSON.parse(await readFile(path.join(directory,`suite-proof-${target}.json`),'utf8')),name=`MatiQ-Voice-${version}-${target}.mqt`,assets=[name,name+'.release.json'];
+    if(proof.version!==version||proof.target!==target||JSON.stringify(Object.keys(proof.artifacts).sort())!==JSON.stringify([...assets].sort())||!['trusted-native-package','explicit-install','native-English-inference','busy-close-refusal','verified-disposal'].every(check=>proof.checks.includes(check)))throw Error('Require actual hosted Voice qualification for '+target);
+    for(const asset of assets){const digest=createHash('sha256').update(await readFile(path.join(directory,asset))).digest('hex');if(digest!==proof.artifacts[asset]||(asset===name&&digest!==proof.packageSha256))throw Error('Hosted qualification does not cover suite tool bytes: '+asset);checksums.push(`${digest}  ${asset}`);}
+  }
   await writeFile(path.join(directory, 'SHA256SUMS.txt'), checksums.join('\n') + '\n');
   await writeFile(path.join(directory, 'RELEASE_NOTES.md'), `# MatiQ Voice ${version}${preview ? ' — preview' : ''}
 
@@ -56,7 +62,7 @@ Unit tests, E2E, packaging and packaged native inference pass on both build plat
 
 Free for personal and internal business use under the [MatiQ Voice No-Sale License](https://github.com/GoMatiQ-inc/matiq-voice/blob/${tag}/LICENSE). Preserve attribution. Paid access, hosting and paid bundles require separate permission. Third-party licenses remain intact.
 `);
-  return [...names, ...updates, ...files.filter(file => optional.includes(file))];
+  return [...names, ...updates, ...files.filter(file => optional.includes(file)),...toolAssets];
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

@@ -2,9 +2,10 @@ const {spawn,execFile} = require('node:child_process');
 const execFileAsync=require('node:util').promisify(execFile);
 const {createInterface} = require('node:readline');
 
-function captureTarget(executable, args) {
+function captureTarget(executable, args, {onSpawn} = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(executable, args, {windowsHide: true});
+    onSpawn?.(child);
     const lines = createInterface({input: child.stdout});
     let ready = false, terminal = false, stderr = '', pasteResolve, pasteReject;
     let timeout = setTimeout(() => { child.kill(); reject(new Error('Destination tracking could not start. Use Copy.')); }, 10000);

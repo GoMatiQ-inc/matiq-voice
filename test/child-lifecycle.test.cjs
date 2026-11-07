@@ -1,0 +1,4 @@
+const test=require('node:test'),assert=require('node:assert/strict'),{EventEmitter}=require('node:events');
+const {watch,hasExited,waitForExit}=require('../src/child-lifecycle.cjs');
+test('signal-terminated and already-observed helpers are stopped without waiting',async()=>{const signaled=Object.assign(new EventEmitter(),{exitCode:null,signalCode:'SIGTERM'});await waitForExit(signaled,5);assert.equal(hasExited(signaled),true);const observed=watch(new EventEmitter());observed.emit('exit',0);await waitForExit(observed,5);});
+test('a failed stop remains tracked for the next actual exit',async()=>{const child=watch(new EventEmitter());await assert.rejects(waitForExit(child,5),/did not stop/);assert.equal(hasExited(child),false);child.emit('exit',0);await waitForExit(child,5);assert.equal(hasExited(child),true);});

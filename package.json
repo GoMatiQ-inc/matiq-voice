@@ -1,14 +1,14 @@
 {
   "name": "matiq-voice",
   "productName": "MatiQ Voice",
-  "version": "0.3.11",
+  "version": "0.3.12",
   "private": true,
   "description": "Private English dictation and meeting notes by MatiQ.",
   "author": "MatiQ Inc",
   "main": "src/main.cjs",
   "scripts": {
     "start": "electron .",
-    "test": "node --test",
+    "test": "node --test test/*.test.cjs",
     "test:desktop": "node scripts/e2e.mjs",
     "engine:build": "node scripts/build-engine.mjs",
     "package": "electron-builder --publish never",
@@ -20,11 +20,14 @@
     "test:packaged": "node scripts/e2e-packaged.mjs",
     "test:installer": "node scripts/check-mac-installer.mjs",
     "icons:mac": "node scripts/build-mac-icon.mjs",
-    "test:capture": "node scripts/e2e-capture.mjs"
+    "test:capture": "node scripts/e2e-capture.mjs",
+    "tool:package": "node scripts/package-tool.cjs",
+    "test:suite": "node scripts/suite-test.cjs"
   },
   "devDependencies": {
-    "electron": "45.0.0",
-    "electron-builder": "26.15.3",
+    "@matiq-solutions/sdk": "https://github.com/GoMatiQ-inc/matiq-solutions/releases/download/sdk-v0.1.3/matiq-solutions-sdk-0.1.3.tgz",
+    "electron": "45.2.3",
+    "electron-builder": "26.18.0",
     "js-yaml": "4.3.2",
     "playwright": "1.64.1"
   },
@@ -36,7 +39,8 @@
       "package.json",
       "config/oauth.json",
       "LICENSE",
-      "NOTICE"
+      "NOTICE",
+      "matiq-tool.json"
     ],
     "extraResources": [
       {
@@ -107,6 +111,8 @@
     }
   },
   "dependencies": {
+    "@matiq-solutions/runtime": "https://github.com/GoMatiQ-inc/matiq-solutions/releases/download/sdk-v0.1.3/matiq-solutions-runtime-0.1.3.tgz",
+    "@matiq-solutions/shell": "https://github.com/GoMatiQ-inc/matiq-solutions/releases/download/sdk-v0.1.3/matiq-solutions-shell-0.1.3.tgz",
     "electron-updater": "6.8.9",
     "sherpa-onnx-node": "2.0.0"
   },

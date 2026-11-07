@@ -7,17 +7,29 @@ const {Readable, Transform} = require('node:stream');
 const {pipeline} = require('node:stream/promises');
 const {MODELS, whisperArgs, transcriptFromFile} = require('./core.cjs');
 
-function run(executable, args, {signal, timeout = 600000} = {}) {
+function run(executable, args, {signal, timeout = 600000, onSpawn} = {}) {
   return new Promise((resolve, reject) => {
+    signal?.throwIfAborted();
     const child = spawn(executable, args, {windowsHide: true, signal});
-    let stdout = '', stderr = '';
-    const timer = setTimeout(() => child.kill(), timeout);
+    onSpawn?.(child);
+    let stdout = '', stderr = '', failure, stopping = false, escalation, deadline;
+    function stop(error) {
+      failure ||= error;
+      if(stopping)return;stopping=true;
+      child.kill();
+      escalation=setTimeout(()=>child.kill('SIGKILL'),1000);
+      deadline=setTimeout(()=>reject(new Error('The speech engine did not exit. Close Voice to retry native cleanup before reopening.')),4000);
+    }
+    const timer = setTimeout(() => stop(new Error('Speech recognition exceeded its time limit. Retry with a smaller model.')), timeout);
     child.stdout.on('data', data => { stdout = (stdout + data).slice(-64000); });
     child.stderr.on('data', data => { stderr = (stderr + data).slice(-64000); });
-    child.on('error', error => { clearTimeout(timer); reject(error); });
+    // AbortError can arrive before the operating system actually stops the child.
+    // Keep the job and its ownership alive until close confirms termination.
+    child.on('error', error => stop(error));
     child.on('close', code => {
-      clearTimeout(timer);
-      if (code === 0) resolve(stdout.trim());
+      clearTimeout(timer);clearTimeout(escalation);clearTimeout(deadline);
+      if(failure)reject(failure);
+      else if (code === 0) resolve(stdout.trim());
       else reject(new Error(`${path.basename(executable)} exited (${code ?? 'terminated'}). ${stderr.slice(-1500) || 'Check permissions or retry with a smaller model.'}`));
     });
   });
@@ -52,13 +64,13 @@ async function downloadModel(id, directory, progress, signal) {
   }
 }
 
-async function transcribe({binary, model, audio, directory, signal}) {
+async function transcribe({binary, model, audio, directory, signal, onSpawn}) {
   const job = await fs.mkdtemp(path.join(directory, 'dictation-'));
   try {
     const recording = path.join(job, 'recording.wav');
     const output = path.join(job, 'transcript');
     await fs.writeFile(recording, audio, {mode: 0o600});
-    await run(binary, whisperArgs(model, recording, output), {signal});
+    await run(binary, whisperArgs(model, recording, output), {signal,onSpawn});
     return transcriptFromFile(await fs.readFile(`${output}.txt`, 'utf8'));
   } finally {
     await fs.rm(job, {recursive: true, force: true});

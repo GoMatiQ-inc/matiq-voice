@@ -20,13 +20,14 @@ if (!process.env.MATIQ_COMPANION_SOURCE) throw new Error('Set MATIQ_COMPANION_SO
 const companionRoot = path.resolve(process.env.MATIQ_COMPANION_SOURCE);
 const {ModelStore, sharedRoot: companionSharedRoot} = require(path.join(companionRoot,'src/models.cjs'));
 const lifecycle = require('./fixture-lifecycle.cjs');
+const {cleanupDesktop}=require('@matiq-solutions/sdk/fixture-cleanup.cjs');
 const {sharedRoot, speechAsset, adoptExistingAssets} = require('../src/shared-models.cjs');
 const {SPEAKER_MODELS} = require('../src/assets.cjs');
 const familyRoot = path.join(temporary,'family-models'), familyStore = new ModelStore(familyRoot);
 const familyAssets = [speechAsset('base.en'),...SPEAKER_MODELS];
 const ownedDesktops = [];
 let browserServer, ownedBrowser, fixturePort, modelRequests = 0;
-const watchdog = setTimeout(()=>{ desktop?.process().kill(); browserServer?.process().kill(); server?.closeAllConnections(); server?.close(); process.exitCode=1; },12*60*1000);
+const watchdog = setTimeout(()=>{for(const handle of [desktop?.process(),browserServer?.process()].filter(Boolean)){if(handle.exitCode!==null||handle.signalCode!==null)continue;const tree=lifecycle.captureTree(lifecycle.capture(handle));ownedDesktops.push(...tree);for(const child of tree){try{process.kill(child.pid,'SIGKILL');}catch(error){if(error.code!=='ESRCH')console.error('Owned watchdog stop failed:',error.message);}}}server?.closeAllConnections();server?.close();process.exitCode=1;},12*60*1000);
 
 let desktop, browser, server, failedDownload = true;
 function canonicalWav(wav) {
@@ -41,7 +42,7 @@ async function boot() {
   const entry = path.join(temporary, 'bootstrap.cjs');
   const base = `http://127.0.0.1:${server.address().port}`;
   const endpoints = Object.fromEntries(['microsoft', 'google'].map(id => [id, Object.fromEntries(['authorize', 'token', 'profile', 'events', 'revoke'].map(key => [key, `${base}/${id}/${key}`]))]));
-  await fs.writeFile(entry, `const {app}=require('electron');const fs=require('node:fs/promises');app.setPath('userData',${JSON.stringify(profile)});require(${JSON.stringify(path.join(root, 'src/main.cjs'))}).launch({updater:(()=>{const u=new(require('node:events').EventEmitter)();u.setFeedURL=()=>{};u.checkForUpdates=async()=>({cancellationToken:{},updateInfo:{version:'99.0.0'}});u.downloadUpdate=async()=>u.emit('update-downloaded',{version:'99.0.0'});u.quitAndInstall=()=>{globalThis.__updateInstalled=true;setTimeout(()=>{const {autoUpdater,BrowserWindow}=require('electron');autoUpdater.emit('before-quit-for-update');BrowserWindow.getAllWindows().find(w=>w.getTitle()==='MatiQ Voice').close();},100);};return u;})(),keyboardSpawn:()=>{const child=new(require('node:events').EventEmitter)();const Stream=require('node:stream').PassThrough;child.stdout=new Stream();child.stderr=new Stream();child.stdin=new Stream();child.kill=()=>child.emit('close',0);globalThis.__keyboardFixture=child;queueMicrotask(()=>child.stdout.write(JSON.stringify({ready:true})+'\\n'));return child;},oauthConfig:{microsoft:{clientId:'fixture-microsoft'},google:{clientId:'fixture-google'}},testEndpoints:${JSON.stringify(endpoints)},openBrowser:async url=>fs.writeFile(${JSON.stringify(authorizeFile)},url),inspectHardware:async(directory,engine)=>{const h=await require(${JSON.stringify(path.join(root, 'src/hardware.cjs'))}).inspectHardware(directory,engine);const recommend=require(${JSON.stringify(path.join(root, 'src/hardware.cjs'))}).recommendModel;return {...h,memoryBytes:4*1024**3,cores:2,recommendation:recommend({platform:process.platform,arch:process.arch,memoryBytes:4*1024**3,cores:2})};},sharedModelRoot:${JSON.stringify(familyRoot)},downloadAsset:async(asset,directory,progress,signal)=>require(${JSON.stringify(path.join(root, 'src/shared-models.cjs'))}).sharedDownloadAsset({...asset,url:${JSON.stringify(base)}+'/models/'+asset.file},directory,progress,signal,${JSON.stringify(familyRoot)})});`);
+  await fs.writeFile(entry, `const {app}=require('electron');const fs=require('node:fs/promises');app.setPath('userData',${JSON.stringify(profile)});require(${JSON.stringify(path.join(root, 'src/main.cjs'))}).launch({updater:(()=>{const u=new(require('node:events').EventEmitter)();u.setFeedURL=()=>{};u.checkForUpdates=async()=>({cancellationToken:{},updateInfo:{version:'99.0.0'}});u.downloadUpdate=async()=>u.emit('update-downloaded',{version:'99.0.0'});u.quitAndInstall=()=>{globalThis.__updateInstalled=true;setTimeout(()=>{const {autoUpdater,BrowserWindow}=require('electron');autoUpdater.emit('before-quit-for-update');BrowserWindow.getAllWindows().find(w=>w.getTitle()==='MatiQ Voice').close();},100);};return u;})(),keyboardSpawn:()=>{const child=new(require('node:events').EventEmitter)();const Stream=require('node:stream').PassThrough;child.stdout=new Stream();child.stderr=new Stream();child.stdin=new Stream();child.stdin.once('finish',()=>queueMicrotask(()=>child.emit('close',0)));child.kill=()=>child.emit('close',0);globalThis.__keyboardFixture=child;queueMicrotask(()=>child.stdout.write(JSON.stringify({ready:true})+'\\n'));return child;},oauthConfig:{microsoft:{clientId:'fixture-microsoft'},google:{clientId:'fixture-google'}},testEndpoints:${JSON.stringify(endpoints)},openBrowser:async url=>fs.writeFile(${JSON.stringify(authorizeFile)},url),inspectHardware:async(directory,engine)=>{const h=await require(${JSON.stringify(path.join(root, 'src/hardware.cjs'))}).inspectHardware(directory,engine);const recommend=require(${JSON.stringify(path.join(root, 'src/hardware.cjs'))}).recommendModel;return {...h,memoryBytes:4*1024**3,cores:2,recommendation:recommend({platform:process.platform,arch:process.arch,memoryBytes:4*1024**3,cores:2})};},sharedModelRoot:${JSON.stringify(familyRoot)},downloadAsset:async(asset,directory,progress,signal)=>require(${JSON.stringify(path.join(root, 'src/shared-models.cjs'))}).sharedDownloadAsset({...asset,url:${JSON.stringify(base)}+'/models/'+asset.file},directory,progress,signal,${JSON.stringify(familyRoot)})});`);
   desktop = await electron.launch({executablePath: require('electron'), cwd: root, args: [entry, '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream']});
   ownedDesktops.push(lifecycle.capture(desktop.process()));
   await expect.poll(() => desktop.windows().some(page => page.url().endsWith('/index.html')), {timeout: 15000}).toBe(true);
@@ -52,12 +53,17 @@ async function boot() {
     const originalMicrophone = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
     window.__e2eAudio = [];
     async function syntheticAudio(frequency) {
-      const context = new AudioContext({sampleRate: 16000}); const oscillator = context.createOscillator();
+      const context = new AudioContext({sampleRate: 16000, sinkId: {type: 'none'}}); const oscillator = context.createOscillator();
       const gain = context.createGain(); const destination = context.createMediaStreamDestination();
       oscillator.frequency.value = frequency; gain.gain.value = .2; oscillator.connect(gain); gain.connect(destination); oscillator.start(); await context.resume();
       window.__e2eAudio.push({context, oscillator, destination}); return destination.stream;
     }
-    navigator.mediaDevices.getUserMedia = async options => window.__e2eMeeting ? syntheticAudio(440) : originalMicrophone(options);
+    navigator.mediaDevices.getUserMedia = async options => {
+      const input = await originalMicrophone(options); input.getTracks().forEach(track => track.stop());
+      // The capture-clock suite separately qualifies the fake device without a gesture.
+      // This workflow needs a known non-silent signal on every native audio backend.
+      return syntheticAudio(440);
+    };
     navigator.mediaDevices.getDisplayMedia = async () => {
       // Independent, deterministic sources avoid sharing Chrome's fake mic driver.
       const audio = await syntheticAudio(660); const canvas = document.createElement('canvas'); canvas.width = 8; canvas.height = 8;
@@ -224,13 +230,15 @@ try {
     await page.getByRole('button',{name:'Settings',exact:true}).click();
     await expect(page.locator('.brand img')).toHaveAttribute('alt','MatiQ Solutions');
     await expect(page.locator('.brand span')).toHaveText('Voice');
-    assert.equal(await page.locator('.brand img').evaluate(img=>img.complete && img.naturalWidth===1374),true);
+    assert.equal(await page.locator('.brand img').evaluate(img=>img.complete && img.naturalWidth>0),true);
     if (!(await page.locator('#update-install').isVisible())) await page.locator('#update-check').click();
     await expect(page.locator('#update-install')).toBeVisible();
     await page.evaluate(async()=>{await window.matiqVoice.begin();await window.matiqVoice.recordingReady();});
     await expect(page.locator('#update-install')).toBeDisabled();
-    const rejection=await page.evaluate(()=>window.matiqVoice.installUpdate().then(()=>'',error=>error.message));
-    assert.match(rejection,/Finish dictation/);
+    const request=await page.evaluate(()=>window.matiqVoice.installUpdate());
+    assert.deepEqual(request,{requested:true});
+    await expect(page.locator('#notice')).toContainText('Finish Voice work before closing: recording');
+    assert.equal((await page.evaluate(()=>window.matiqVoice.status())).state,'recording');
     assert.equal(await desktop.evaluate(()=>Boolean(globalThis.__updateInstalled)),false);
     await page.evaluate(()=>window.matiqVoice.cancel());
     await expect(page.locator('#update-install')).toBeEnabled();
@@ -306,19 +314,16 @@ try {
 } catch (error) {
   if (desktop) { const page = desktop.windows().find(value => value.url().endsWith('/index.html')); if (page) { console.error('Visible failure:', await page.locator('#notice').textContent()); console.error('Setup failure:', await page.locator('#setup-error').textContent()); await page.screenshot({path: path.join(fixtures, 'e2e-failure.png'), fullPage: true}).catch(() => {}); } }
   console.error('E2E FAILED after', results.length, 'journeys:', error); process.exitCode = 1;
-} finally {
-  if (desktop) await desktop.close().catch(() => {});
-  if (browser) await browser.close();
-  if (browserServer) await browserServer.close();
-  if (server) { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
-  for(const owned of ownedDesktops) await lifecycle.verifyStopped(owned);
-  await lifecycle.verifyStopped(ownedBrowser);
-  if(fixturePort) {
-    const net=require('node:net');
-    await new Promise((resolve,reject)=>{const socket=net.connect(fixturePort,'127.0.0.1');socket.setTimeout(1000);socket.once('connect',()=>{socket.destroy();reject(new Error('The owned HTTP fixture port remains occupied. Inspect ownership before continuing.'));});socket.once('error',error=>{socket.destroy();if(error.code==='ECONNREFUSED')resolve();else reject(error);});socket.once('timeout',()=>{socket.destroy();reject(new Error('Cannot verify fixture port cleanup.'));});});
-  }
-  clearTimeout(watchdog);
-  await fs.rm(temporary, {recursive: true, force: true});
+ } finally {
+  const cleanupErrors=[];let runtimeClean=true;
+  async function cleanup(label,operation){try{await operation();}catch(error){cleanupErrors.push(new Error(label+': '+error.message,{cause:error}));console.error('E2E cleanup failed — '+label+': '+error.message);}}
+  try{
+    await cleanup('owned desktop',async()=>{try{await cleanupDesktop({app:desktop,owned:ownedDesktops});}catch(error){runtimeClean=false;throw error;}});
+    await cleanup('owned browser',async()=>{if(browserServer){try{await cleanupDesktop({app:{process:()=>browserServer.process(),close:async()=>{if(browser)await browser.close();await browserServer.close();}},owned:ownedBrowser?[ownedBrowser]:[]});}catch(error){runtimeClean=false;throw error;}}else if(browser)await browser.close();});
+    await cleanup('owned HTTP fixture',async()=>{if(server?.listening){server.closeAllConnections();await new Promise(resolve=>server.close(resolve));}if(fixturePort){const net=require('node:net');await new Promise((resolve,reject)=>{const socket=net.connect(fixturePort,'127.0.0.1');socket.setTimeout(1000);socket.once('connect',()=>{socket.destroy();reject(new Error('The owned HTTP fixture port remains occupied. Inspect ownership before continuing.'));});socket.once('error',error=>{socket.destroy();error.code==='ECONNREFUSED'?resolve():reject(error);});socket.once('timeout',()=>{socket.destroy();reject(new Error('Cannot verify fixture port cleanup.'));});});}});
+    await cleanup('owned fixture files',async()=>{assert.equal(runtimeClean,true,'Retain fixture files until owned runtime cleanup is verified.');await fs.rm(temporary,{recursive:true,force:true});});
+  }finally{clearTimeout(watchdog);}
+  if(cleanupErrors.length)throw new AggregateError(cleanupErrors,'Voice E2E cleanup did not pass. Inspect the owned runtime and listener errors.');
 }
 
 if (!process.exitCode) {

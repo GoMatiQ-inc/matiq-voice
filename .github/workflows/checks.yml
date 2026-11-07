@@ -171,12 +171,37 @@ jobs:
         env:
           MATIQ_WINDOWS_PUBLISHER: ${{ secrets.MATIQ_WINDOWS_PUBLISHER }}
       - run: npm run test:packaged
+      - uses: actions/checkout@v4
+        with:
+          repository: GoMatiQ-inc/matiq-solutions
+          ref: fe010372a4e6bb46d2d92390fef842c8df80b39a
+          path: suite-host
+      - name: Install the exact suite integration harness
+        working-directory: suite-host
+        run: npm ci --no-audit --no-fund
+      - name: Package the native standalone payload for the suite
+        run: npm run tool:package
+        env:
+          MATIQ_TOOL_SIGNING_KEY: ${{ secrets.MATIQ_TOOL_SIGNING_KEY }}
+      - name: Verify the native tool against suite publisher trust
+        shell: bash
+        env:
+          MATIQ_SHARED_MODEL_ROOT: ${{ runner.temp }}/voice-models
+        run: node suite-host/scripts/tool-package-fixture.cjs "dist/MatiQ-Voice-$(node -p "require('./package.json').version")-$(node -p "process.platform+'-'+process.arch").mqt.release.json" "$RUNNER_TEMP/tool-suite-fixture.json"
+      - name: Qualify the actual tool payload inside the suite
+        run: npm run test:suite
+        env:
+          MATIQ_SOLUTIONS_TEST_ROOT: ${{ github.workspace }}/suite-host
+          MATIQ_SOLUTIONS_TEST_PACKAGE_CONFIG: ${{ runner.temp }}/tool-suite-fixture.json
       - uses: actions/upload-artifact@v4
         with:
           name: signed-installers-${{ runner.os }}-${{ runner.arch }}
           retention-days: 7
           path: |
             dist/*.pkg
+            dist/*.mqt
+            dist/*.mqt.release.json
+            dist/suite-proof-*.json
             dist/*.exe
             dist/*-signature.json
             dist/*.zip
@@ -218,7 +243,7 @@ jobs:
           if [[ "$RELEASE_TAG" == *-preview.* ]]; then flags+=(--prerelease); fi
           shopt -s nullglob
           gh release create "$RELEASE_TAG" \
-            release-assets/*.pkg release-assets/*.exe release-assets/*.zip release-assets/*.yml release-assets/*.blockmap release-assets/SHA256SUMS.txt \
+            release-assets/*.pkg release-assets/*.exe release-assets/*.zip release-assets/*.yml release-assets/*.blockmap release-assets/*.mqt release-assets/*.mqt.release.json release-assets/SHA256SUMS.txt \
             --verify-tag "${flags[@]}" \
             --title "MatiQ Voice $RELEASE_TAG" \
             --notes-file release-assets/RELEASE_NOTES.md

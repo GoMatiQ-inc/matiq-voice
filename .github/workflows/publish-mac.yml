@@ -47,20 +47,28 @@ jobs:
           folder = pathlib.Path('release-assets')
           name = f'MatiQ-Voice-{version}-mac-arm64.pkg'
           zip_name = f'MatiQ-Voice-{version}-mac-arm64.zip'
-          assets = {name, zip_name, 'latest-mac.yml'}
+          tool_name = f'MatiQ-Voice-{version}-darwin-arm64.mqt'
+          tool_assets = {tool_name, tool_name + '.release.json'}
+          assets = {name, zip_name, 'latest-mac.yml'} | tool_assets
           optional = {zip_name + '.blockmap'}
           present = {p.name for p in folder.iterdir()}
-          assert assets | {'mac-signature.json'} <= present and present <= assets | optional | {'mac-signature.json'}, 'Require only the verified installer, update ZIP, metadata and optional blockmap.'
+          assert assets | {'mac-signature.json', 'suite-proof-darwin-arm64.json'} <= present and present <= assets | optional | {'mac-signature.json', 'suite-proof-darwin-arm64.json'}, 'Require only the verified installer, update ZIP, metadata and optional blockmap.'
           digest = hashlib.sha256((folder/name).read_bytes()).hexdigest()
           proof = json.loads((folder/'mac-signature.json').read_text())
           assert proof['version'] == version and proof['artifact'] == name and proof['sha256'] == digest, 'Verification report must cover these exact installer bytes.'
           assert proof['platform'] == 'darwin' and all(proof.get(k) is True for k in ['signed', 'notarized', 'stapled']) and proof.get('team'), 'Require Developer ID signatures and Apple notarization/stapling.'
-          published = sorted(present - {'mac-signature.json'})
-          assert set(proof.get('assets', {})) == set(published), 'Signature report must cover every update asset.'
+          published = sorted(present - {'mac-signature.json', 'suite-proof-darwin-arm64.json'})
+          suite = json.loads((folder/'suite-proof-darwin-arm64.json').read_text())
+          assert suite['version'] == version and suite['target'] == 'darwin-arm64'
+          for check in ['trusted-native-package','explicit-install','native-English-inference','busy-close-refusal','verified-disposal']:
+              assert check in suite['checks'], f'Require actual hosted Voice qualification: {check}'
+          assert set(suite['artifacts']) == tool_assets
+          assert suite['packageSha256'] == suite['artifacts'][tool_name]
+          assert set(proof.get('assets', {})) == set(published) - tool_assets, 'Signature report must cover every update asset.'
           checksums = []
           for asset in published:
               digest = hashlib.sha256((folder/asset).read_bytes()).hexdigest()
-              assert proof['assets'][asset] == digest, f'Verification report does not cover {asset} bytes.'
+              assert (suite['artifacts'] if asset in tool_assets else proof['assets'])[asset] == digest, f'Verification report does not cover {asset} bytes.'
               checksums.append(f'{digest}  {asset}')
           (folder/'SHA256SUMS.txt').write_text('\n'.join(checksums) + '\n')
           notes = f"""MatiQ Voice {version} — signed Apple Silicon Mac installer
@@ -88,6 +96,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           shopt -s nullglob
-          gh release create "$RELEASE_TAG" release-assets/*.pkg release-assets/*.zip release-assets/*.blockmap release-assets/latest-mac.yml release-assets/SHA256SUMS.txt \
+          gh release create "$RELEASE_TAG" release-assets/*.pkg release-assets/*.zip release-assets/*.blockmap release-assets/latest-mac.yml release-assets/*.mqt release-assets/*.mqt.release.json release-assets/SHA256SUMS.txt \
             --target "$SOURCE_SHA" --title "MatiQ Voice $RELEASE_TAG — signed Mac installer" \
             --notes-file release-assets/RELEASE_NOTES.md --latest
