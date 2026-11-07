@@ -62,6 +62,7 @@ async function start(options) {
   const win = host?.window || new BrowserWindow({width: 1120, height: 820, minWidth: 840, minHeight: 640, title: 'MatiQ Voice', backgroundColor: '#ffffff', show: false,
     webPreferences: {preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false}});
   const workspace = host?.view.webContents || win.webContents;
+  const workspaceFocused=()=>win.isFocused()&&(!host||workspace.isFocused());
   const requireFrame=host?null:require("@matiq-solutions/runtime/trusted-frame.cjs").frameGuard(workspace,path.join(__dirname,"ui/index.html"));
   const hud = new BrowserWindow({width: 248, height: 60, frame: false, transparent: true, hasShadow: false, resizable: false, focusable: false, alwaysOnTop: true, skipTaskbar: true, show: false,
     webPreferences: {preload: path.join(__dirname, 'hud-preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false}});
@@ -220,7 +221,7 @@ async function start(options) {
     } finally { savingSettings = false; }
   });
   handle('binding-record', mode => {
-    if (!['toggle','hold'].includes(mode) || state !== 'idle' || !win.isFocused()) throw new Error('Open Settings and finish recording before choosing a binding.');
+    if (!['toggle','hold'].includes(mode) || state !== 'idle' || !workspaceFocused()) throw new Error('Open Settings and finish recording before choosing a binding.');
     keyboard.record(mode);
   });
   handle('binding-cancel', () => keyboard.cancelRecord());
@@ -256,7 +257,8 @@ async function start(options) {
   handle('setup-microphone-test', async input => {
     const wav = validateWav(input); let peak = 0;
     for (let offset = 44; offset < wav.length; offset += 2) peak = Math.max(peak, Math.abs(wav.readInt16LE(offset)) / 32768);
-    if (wav.length < 44 + 32000 || peak < .005) throw new Error('No clear microphone signal was detected. Check the input, speak closer, and test again.');
+    if (wav.length < 44 + 32000) throw new Error('The microphone captured less than one second of audio. Check the input and test again.');
+    if (peak < .005) throw new Error('No clear microphone signal was detected. Check the input, speak closer, and test again.');
     setup.microphoneTested = true; await saveJSON(setupFile, setup); return {peak};
   });
   handle('setup-complete', async () => {
@@ -265,7 +267,7 @@ async function start(options) {
     if (settings.autoPaste && !(await permissionStatus()).accessibility) throw new Error('Grant Accessibility permission or turn off automatic paste before finishing setup.');
     setup.completed = true; setup.permissionsReviewed = true; setup.version = 1; await saveJSON(setupFile, setup); return setup;
   });
-  handle('login-at-startup', async enabled => { if (typeof enabled !== 'boolean' || !app.isPackaged) throw new Error('Launch at login is available in the installed MatiQ Voice app.'); app.setLoginItemSettings({openAtLogin: enabled}); setup.launchAtLogin = enabled; await saveJSON(setupFile, setup); });
+  handle('login-at-startup', async enabled => { if(host)throw new Error('Suite startup is managed by MatiQ Solutions through your operating system login/startup items.');if (typeof enabled !== 'boolean' || !app.isPackaged) throw new Error('Launch at login is available in the installed MatiQ Voice app.'); app.setLoginItemSettings({openAtLogin: enabled}); setup.launchAtLogin = enabled; await saveJSON(setupFile, setup); });
   handle('begin', async () => {
     if (updates.installing) throw new Error('MatiQ Voice is restarting to update.');
     if (state !== 'idle') throw new Error('Finish the current operation first.');
@@ -276,7 +278,7 @@ async function start(options) {
       const availability = await ready(); if (ticket !== generation) throw new Error('Recording was cancelled.');
       if (!availability.engineReady || !availability.modelReady) throw new Error('The local speech engine or model is missing. Open Settings and run setup.');
       lastAudio = null; target = null; let destination = null;
-      if (!win.isFocused() && settings.autoPaste) { try { destination = await input(); } catch (error) { notice(`Automatic paste is unavailable: ${error.message} You can still record and copy.`); } }
+      if (!workspaceFocused() && settings.autoPaste) { try { destination = await input(); } catch (error) { notice(`Automatic paste is unavailable: ${error.message} You can still record and copy.`); } }
       if (ticket !== generation) { destination?.cancel(); throw new Error('Recording was cancelled.'); } target = destination; return {maxSeconds: MAX_SECONDS};
     } catch (error) { if (ticket === generation) { target = null; setState('idle'); } throw error; }
   });

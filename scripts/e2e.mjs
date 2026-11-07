@@ -55,7 +55,16 @@ async function boot() {
     async function syntheticAudio(frequency) {
       const context = new AudioContext({sampleRate: 16000, sinkId: {type: 'none'}}); const oscillator = context.createOscillator();
       const gain = context.createGain(); const destination = context.createMediaStreamDestination();
-      oscillator.frequency.value = frequency; gain.gain.value = .2; oscillator.connect(gain); gain.connect(destination); oscillator.start(); await context.resume();
+      oscillator.frequency.value = frequency; gain.gain.value = .2; oscillator.connect(gain); gain.connect(destination);
+      // Drive the generator even when the destination stream has no consumer yet.
+      // sinkId:none keeps this independent clock silent on the runner.
+      gain.connect(context.destination); oscillator.start(); await context.resume();
+      const probe = context.createAnalyser(); gain.connect(probe); const samples = new Float32Array(probe.fftSize);
+      const deadline = performance.now() + 3000;
+      do { await new Promise(resolve => setTimeout(resolve, 25)); probe.getFloatTimeDomainData(samples); }
+      while (!samples.some(sample => Math.abs(sample) > .05) && performance.now() < deadline);
+      gain.disconnect(probe);
+      if (!samples.some(sample => Math.abs(sample) > .05)) throw new Error('Synthetic audio generator produced silence; inspect the test AudioContext clock.');
       window.__e2eAudio.push({context, oscillator, destination}); return destination.stream;
     }
     navigator.mediaDevices.getUserMedia = async options => {

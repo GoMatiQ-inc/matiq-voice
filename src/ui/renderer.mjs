@@ -31,7 +31,9 @@ function paint() {
   $('background-state').textContent = idle ? 'Local processing' : labels[state] || state;
   $('retry').hidden = !snapshot.canRetry;
   $('model-status').textContent = snapshot.modelReady && snapshot.speakerReady ? 'Speech and speaker models are installed. Recognition can run offline.' : 'Download the selected speech model and speaker models before completing setup.';
-  $('launch-login').disabled = !snapshot.packaged;
+  $('launch-login').disabled = !snapshot.packaged || snapshot.hosted;
+  $('launch-login').parentElement.hidden = Boolean(snapshot.hosted);
+  if(snapshot.hosted){$('startup-help').textContent='Suite startup is managed in your operating system login/startup items. Open Voice in the suite to enable its background controls. Close Voice stops this tool; Quit MatiQ Solutions stops the suite.';$('quit-app').textContent='Close Voice';}
   $('quit-app').disabled = !idle || starting;
   const update = snapshot.updates;
   $('update-status').textContent = update.message;
@@ -127,12 +129,13 @@ function renderSetup() {
     content.innerHTML = `<p>Current input: ${escape($('microphone').selectedOptions[0]?.textContent || 'System default')}</p><button id="setup-test-microphone" ${setupBusy ? 'disabled' : ''}>${setupBusy ? 'Listening to the microphone…' : 'Test microphone'}</button><progress id="setup-microphone-level" max="1" value="0"></progress><p class="caption">${snapshot.setup.microphoneTested ? 'Audio signal detected. You can continue.' : 'The test listens for two seconds. Check your selected microphone in Settings if necessary.'}</p>`;
     $('setup-test-microphone').onclick = async () => {
       setupBusy = true; renderSetup(); let capture;
-      try { capture = await captureAudio(await microphone(snapshot.settings.microphone), {maxSeconds: 5, onLevel: level => { const meter = $('setup-microphone-level'); if (meter) meter.value = level; }}); await new Promise(resolve => setTimeout(resolve, 2200)); await api.microphoneTest(await capture.stop()); capture = null; await refresh(); setupBusy = false; renderSetup(); }
+      try { capture = await captureAudio(await microphone(snapshot.settings.microphone), {maxSeconds: 5, onLevel: level => { const meter = $('setup-microphone-level'); if (meter) meter.value = level; }}); const deadline = performance.now() + 10000; while (capture.seconds < 2 && performance.now() < deadline) await new Promise(resolve => setTimeout(resolve, 100)); if (capture.seconds < 2) throw new Error('The microphone is not supplying audio quickly enough. Check the selected input and test again.'); await api.microphoneTest(await capture.stop()); capture = null; await refresh(); setupBusy = false; renderSetup(); }
       catch (error) { await capture?.stop().catch(() => {}); setupBusy = false; renderSetup(); setupError(error); }
     };
     $('setup-next').disabled ||= !snapshot.setup.microphoneTested;
   } else if (setupStep === 3) {
     content.innerHTML = `<p>${snapshot.platform === 'darwin' ? 'Accessibility permission allows MatiQ Voice to send a paste shortcut to the destination app.' : 'Windows can reject insertion into protected or administrator-level apps. Copy remains available.'}</p><div class="field-row"><button id="setup-permission">Open paste permissions</button><button id="setup-permission-refresh">Check again</button></div><label class="check"><input id="setup-copy-only" type="checkbox" ${snapshot.settings.autoPaste ? '' : 'checked'}> Use Copy for now</label><p class="caption">${snapshot.permissions.pasteError || (snapshot.permissions.accessibility ? 'The native paste helper has Accessibility access. Changed or unsupported target fields can still require Copy.' : 'The native paste helper does not have Accessibility access. Enable the installed MatiQ Voice app, then click Check again. If an old entry is already enabled, remove it, add the installed app again, and restart MatiQ Voice.')}</p>`;
+    if (snapshot.hosted) content.querySelectorAll('p').forEach(paragraph => { paragraph.textContent = paragraph.textContent.replaceAll('MatiQ Voice', snapshot.applicationName); });
     $('setup-permission').onclick = () => api.accessibility().catch(setupError);
     $('setup-permission-refresh').onclick = async () => { await refresh(); renderSetup(); };
     $('setup-copy-only').onchange = async event => { $('autoPaste').checked = !event.target.checked; await savePreferences(); renderSetup(); };
