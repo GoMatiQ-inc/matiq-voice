@@ -325,3 +325,7 @@ imply endorsement of a fork. Earlier versions retain their original licenses.
 ## Shared MatiQ model artifacts
 
 Model downloads use the shared MatiQ artifact store contract documented by MatiQ Companion. Speech models use `asr`/GGML, speaker models use `speaker`/ONNX, and chat models use `llm`/GGUF. Artifact identity is SHA-256 plus kind, not a display name or extension. Version 0.3.9 adopts existing verified Voice or shared-cache files during startup without downloading anything. Missing models still require an explicit download/verification action. Workers retain their existing paths through hard links on a compatible filesystem. Across filesystems, copying is necessary and can use additional space. Downloads coordinate through an exclusive artifact lock; stale locks fail visibly rather than being silently stolen. Earlier installed Voice versions keep their existing model storage until updated to a build with this bridge.
+
+## UI prototype
+
+The repository-owned [prototype](prototype/README.md) reuses this app’s existing renderer and exact shared shell in standalone and suite modes. Iterate there and obtain explicit owner approval before applying a design. Native operations use sample state in the preview; browser qualification is separate from native acceptance.

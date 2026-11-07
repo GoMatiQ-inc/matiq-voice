@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "id": "com.matiq.voice",
+  "name": "MatiQ Voice",
+  "workspace": "src/ui/index.html",
+  "roots": [
+    "src/ui"
+  ],
+  "bridge": "prototype/bridge.js",
+  "overrides": {
+    "src/ui/capture.mjs": "prototype/capture.mjs"
+  },
+  "baselineVersion": "0.3.13"
+}

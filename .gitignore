@@ -10,3 +10,9 @@ engine/*
 .DS_Store
 
 /family-companion/
+
+# Generated prototypes and machine-specific checkout registration
+.prototype/
+prototype/tools.local.json
+prototype/registration.local.json
+prototype/last-build.local.json
