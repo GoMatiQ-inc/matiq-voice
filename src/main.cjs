@@ -257,7 +257,8 @@ async function start(options) {
   handle('setup-microphone-test', async input => {
     const wav = validateWav(input); let peak = 0;
     for (let offset = 44; offset < wav.length; offset += 2) peak = Math.max(peak, Math.abs(wav.readInt16LE(offset)) / 32768);
-    if (wav.length < 44 + 32000 || peak < .005) throw new Error('No clear microphone signal was detected. Check the input, speak closer, and test again.');
+    if (wav.length < 44 + 32000) throw new Error('The microphone captured less than one second of audio. Check the input and test again.');
+    if (peak < .005) throw new Error('No clear microphone signal was detected. Check the input, speak closer, and test again.');
     setup.microphoneTested = true; await saveJSON(setupFile, setup); return {peak};
   });
   handle('setup-complete', async () => {
