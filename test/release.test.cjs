@@ -51,6 +51,7 @@ async function proofs(directory, names) {
     updateAssets[name]=createHash('sha256').update(bytes).digest('hex');
     updateAssets[metadata]=createHash('sha256').update(await fs.readFile(path.join(directory,metadata))).digest('hex');
   }
+  for(const target of ['darwin-arm64','win32-x64']){const tool=`MatiQ-Voice-0.3.4-${target}.mqt`,artifacts={};for(const name of [tool,tool+'.release.json']){const bytes=Buffer.from('qualified-fixture-'+name);await fs.writeFile(path.join(directory,name),bytes);artifacts[name]=createHash('sha256').update(bytes).digest('hex');}await fs.writeFile(path.join(directory,`suite-proof-${target}.json`),JSON.stringify({version:'0.3.4',target,artifacts,packageSha256:artifacts[tool],checks:['trusted-native-package','explicit-install','native-English-inference','busy-close-refusal','verified-disposal']}));}
   for (const [index, name] of names.entries()) await fs.writeFile(path.join(directory, index === 0 ? 'mac-signature.json' : 'windows-signature.json'), JSON.stringify({platform: index === 0 ? 'darwin' : 'win32', version: '0.3.4', assets:updateAssets, artifact: name, sha256: digest, signed: true, notarized: true, stapled: true, team: 'TESTTEAM01', timestamped: true, publisher: 'Fixture Publisher'}));
 }
 test('stable release accepts matching native signature and notarization reports', () => fixture(async (directory, names, prepareRelease) => {

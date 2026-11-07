@@ -20,13 +20,14 @@ if (!process.env.MATIQ_COMPANION_SOURCE) throw new Error('Set MATIQ_COMPANION_SO
 const companionRoot = path.resolve(process.env.MATIQ_COMPANION_SOURCE);
 const {ModelStore, sharedRoot: companionSharedRoot} = require(path.join(companionRoot,'src/models.cjs'));
 const lifecycle = require('./fixture-lifecycle.cjs');
+const {cleanupDesktop}=require('@matiq-solutions/sdk/fixture-cleanup.cjs');
 const {sharedRoot, speechAsset, adoptExistingAssets} = require('../src/shared-models.cjs');
 const {SPEAKER_MODELS} = require('../src/assets.cjs');
 const familyRoot = path.join(temporary,'family-models'), familyStore = new ModelStore(familyRoot);
 const familyAssets = [speechAsset('base.en'),...SPEAKER_MODELS];
 const ownedDesktops = [];
 let browserServer, ownedBrowser, fixturePort, modelRequests = 0;
-const watchdog = setTimeout(()=>{ desktop?.process().kill(); browserServer?.process().kill(); server?.closeAllConnections(); server?.close(); process.exitCode=1; },12*60*1000);
+const watchdog = setTimeout(()=>{for(const handle of [desktop?.process(),browserServer?.process()].filter(Boolean)){if(handle.exitCode!==null||handle.signalCode!==null)continue;const tree=lifecycle.captureTree(lifecycle.capture(handle));ownedDesktops.push(...tree);for(const child of tree){try{process.kill(child.pid,'SIGKILL');}catch(error){if(error.code!=='ESRCH')console.error('Owned watchdog stop failed:',error.message);}}}server?.closeAllConnections();server?.close();process.exitCode=1;},12*60*1000);
 
 let desktop, browser, server, failedDownload = true;
 function canonicalWav(wav) {
@@ -234,8 +235,10 @@ try {
     await expect(page.locator('#update-install')).toBeVisible();
     await page.evaluate(async()=>{await window.matiqVoice.begin();await window.matiqVoice.recordingReady();});
     await expect(page.locator('#update-install')).toBeDisabled();
-    const rejection=await page.evaluate(()=>window.matiqVoice.installUpdate().then(()=>'',error=>error.message));
-    assert.match(rejection,/Finish dictation/);
+    const request=await page.evaluate(()=>window.matiqVoice.installUpdate());
+    assert.deepEqual(request,{requested:true});
+    await expect(page.locator('#notice')).toContainText('Finish Voice work before closing: recording');
+    assert.equal((await page.evaluate(()=>window.matiqVoice.status())).state,'recording');
     assert.equal(await desktop.evaluate(()=>Boolean(globalThis.__updateInstalled)),false);
     await page.evaluate(()=>window.matiqVoice.cancel());
     await expect(page.locator('#update-install')).toBeEnabled();
@@ -311,19 +314,16 @@ try {
 } catch (error) {
   if (desktop) { const page = desktop.windows().find(value => value.url().endsWith('/index.html')); if (page) { console.error('Visible failure:', await page.locator('#notice').textContent()); console.error('Setup failure:', await page.locator('#setup-error').textContent()); await page.screenshot({path: path.join(fixtures, 'e2e-failure.png'), fullPage: true}).catch(() => {}); } }
   console.error('E2E FAILED after', results.length, 'journeys:', error); process.exitCode = 1;
-} finally {
-  if (desktop) await desktop.close().catch(() => {});
-  if (browser) await browser.close();
-  if (browserServer) await browserServer.close();
-  if (server) { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
-  for(const owned of ownedDesktops) await lifecycle.verifyStopped(owned);
-  await lifecycle.verifyStopped(ownedBrowser);
-  if(fixturePort) {
-    const net=require('node:net');
-    await new Promise((resolve,reject)=>{const socket=net.connect(fixturePort,'127.0.0.1');socket.setTimeout(1000);socket.once('connect',()=>{socket.destroy();reject(new Error('The owned HTTP fixture port remains occupied. Inspect ownership before continuing.'));});socket.once('error',error=>{socket.destroy();if(error.code==='ECONNREFUSED')resolve();else reject(error);});socket.once('timeout',()=>{socket.destroy();reject(new Error('Cannot verify fixture port cleanup.'));});});
-  }
-  clearTimeout(watchdog);
-  await fs.rm(temporary, {recursive: true, force: true});
+ } finally {
+  const cleanupErrors=[];let runtimeClean=true;
+  async function cleanup(label,operation){try{await operation();}catch(error){cleanupErrors.push(new Error(label+': '+error.message,{cause:error}));console.error('E2E cleanup failed — '+label+': '+error.message);}}
+  try{
+    await cleanup('owned desktop',async()=>{try{await cleanupDesktop({app:desktop,owned:ownedDesktops});}catch(error){runtimeClean=false;throw error;}});
+    await cleanup('owned browser',async()=>{if(browserServer){try{await cleanupDesktop({app:{process:()=>browserServer.process(),close:async()=>{if(browser)await browser.close();await browserServer.close();}},owned:ownedBrowser?[ownedBrowser]:[]});}catch(error){runtimeClean=false;throw error;}}else if(browser)await browser.close();});
+    await cleanup('owned HTTP fixture',async()=>{if(server?.listening){server.closeAllConnections();await new Promise(resolve=>server.close(resolve));}if(fixturePort){const net=require('node:net');await new Promise((resolve,reject)=>{const socket=net.connect(fixturePort,'127.0.0.1');socket.setTimeout(1000);socket.once('connect',()=>{socket.destroy();reject(new Error('The owned HTTP fixture port remains occupied. Inspect ownership before continuing.'));});socket.once('error',error=>{socket.destroy();error.code==='ECONNREFUSED'?resolve():reject(error);});socket.once('timeout',()=>{socket.destroy();reject(new Error('Cannot verify fixture port cleanup.'));});});}});
+    await cleanup('owned fixture files',async()=>{assert.equal(runtimeClean,true,'Retain fixture files until owned runtime cleanup is verified.');await fs.rm(temporary,{recursive:true,force:true});});
+  }finally{clearTimeout(watchdog);}
+  if(cleanupErrors.length)throw new AggregateError(cleanupErrors,'Voice E2E cleanup did not pass. Inspect the owned runtime and listener errors.');
 }
 
 if (!process.exitCode) {
