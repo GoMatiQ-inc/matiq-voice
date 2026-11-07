@@ -1,3 +1,4 @@
+const {captureTree}=require("@matiq-solutions/sdk/fixture-lifecycle.cjs");
 const { execFileSync } = require("node:child_process");
 const assert = require("node:assert/strict");
 function listeners() {
@@ -82,4 +83,4 @@ async function verifyStopped(owned) {
     `PASS: owned desktop process exited and ${owned.ports.length} captured listeners are absent.`,
   );
 }
-module.exports = { capture, verifyStopped };
+module.exports = { capture, captureTree, verifyStopped };

@@ -62,6 +62,7 @@ async function start(options) {
   const win = host?.window || new BrowserWindow({width: 1120, height: 820, minWidth: 840, minHeight: 640, title: 'MatiQ Voice', backgroundColor: '#ffffff', show: false,
     webPreferences: {preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false}});
   const workspace = host?.view.webContents || win.webContents;
+  const workspaceFocused=()=>win.isFocused()&&(!host||workspace.isFocused());
   const requireFrame=host?null:require("@matiq-solutions/runtime/trusted-frame.cjs").frameGuard(workspace,path.join(__dirname,"ui/index.html"));
   const hud = new BrowserWindow({width: 248, height: 60, frame: false, transparent: true, hasShadow: false, resizable: false, focusable: false, alwaysOnTop: true, skipTaskbar: true, show: false,
     webPreferences: {preload: path.join(__dirname, 'hud-preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: false}});
@@ -220,7 +221,7 @@ async function start(options) {
     } finally { savingSettings = false; }
   });
   handle('binding-record', mode => {
-    if (!['toggle','hold'].includes(mode) || state !== 'idle' || !win.isFocused()) throw new Error('Open Settings and finish recording before choosing a binding.');
+    if (!['toggle','hold'].includes(mode) || state !== 'idle' || !workspaceFocused()) throw new Error('Open Settings and finish recording before choosing a binding.');
     keyboard.record(mode);
   });
   handle('binding-cancel', () => keyboard.cancelRecord());
@@ -276,7 +277,7 @@ async function start(options) {
       const availability = await ready(); if (ticket !== generation) throw new Error('Recording was cancelled.');
       if (!availability.engineReady || !availability.modelReady) throw new Error('The local speech engine or model is missing. Open Settings and run setup.');
       lastAudio = null; target = null; let destination = null;
-      if (!win.isFocused() && settings.autoPaste) { try { destination = await input(); } catch (error) { notice(`Automatic paste is unavailable: ${error.message} You can still record and copy.`); } }
+      if (!workspaceFocused() && settings.autoPaste) { try { destination = await input(); } catch (error) { notice(`Automatic paste is unavailable: ${error.message} You can still record and copy.`); } }
       if (ticket !== generation) { destination?.cancel(); throw new Error('Recording was cancelled.'); } target = destination; return {maxSeconds: MAX_SECONDS};
     } catch (error) { if (ticket === generation) { target = null; setState('idle'); } throw error; }
   });
