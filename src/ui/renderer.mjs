@@ -31,7 +31,9 @@ function paint() {
   $('background-state').textContent = idle ? 'Local processing' : labels[state] || state;
   $('retry').hidden = !snapshot.canRetry;
   $('model-status').textContent = snapshot.modelReady && snapshot.speakerReady ? 'Speech and speaker models are installed. Recognition can run offline.' : 'Download the selected speech model and speaker models before completing setup.';
-  $('launch-login').disabled = !snapshot.packaged;
+  $('launch-login').disabled = !snapshot.packaged || snapshot.hosted;
+  $('launch-login').parentElement.hidden = Boolean(snapshot.hosted);
+  if(snapshot.hosted){$('startup-help').textContent='Suite startup is managed in your operating system login/startup items. Open Voice in the suite to enable its background controls. Close Voice stops this tool; Quit MatiQ Solutions stops the suite.';$('quit-app').textContent='Close Voice';}
   $('quit-app').disabled = !idle || starting;
   const update = snapshot.updates;
   $('update-status').textContent = update.message;

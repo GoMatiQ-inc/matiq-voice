@@ -266,7 +266,7 @@ async function start(options) {
     if (settings.autoPaste && !(await permissionStatus()).accessibility) throw new Error('Grant Accessibility permission or turn off automatic paste before finishing setup.');
     setup.completed = true; setup.permissionsReviewed = true; setup.version = 1; await saveJSON(setupFile, setup); return setup;
   });
-  handle('login-at-startup', async enabled => { if (typeof enabled !== 'boolean' || !app.isPackaged) throw new Error('Launch at login is available in the installed MatiQ Voice app.'); app.setLoginItemSettings({openAtLogin: enabled}); setup.launchAtLogin = enabled; await saveJSON(setupFile, setup); });
+  handle('login-at-startup', async enabled => { if(host)throw new Error('Suite startup is managed by MatiQ Solutions through your operating system login/startup items.');if (typeof enabled !== 'boolean' || !app.isPackaged) throw new Error('Launch at login is available in the installed MatiQ Voice app.'); app.setLoginItemSettings({openAtLogin: enabled}); setup.launchAtLogin = enabled; await saveJSON(setupFile, setup); });
   handle('begin', async () => {
     if (updates.installing) throw new Error('MatiQ Voice is restarting to update.');
     if (state !== 'idle') throw new Error('Finish the current operation first.');
