@@ -22,3 +22,7 @@ Read README.md, docs/PRODUCT.md and docs/OAUTH.md before changing behavior.
   fixture-provider tests with live Google/Microsoft account qualification.
 - Follow inherited storage-guard and worktree rules. No generated dependencies,
   binaries, private registration config or model files in Git.
+
+## Prototype first
+
+Before implementing UI changes, create or update the repository-owned prototype with the Solutions desktop SDK. Use the exact shared shell and existing renderer source. Do not maintain duplicate tool UI in the suite repository. Register/build it into the Solutions prototype, review standalone and hosted modes, and wait for explicit owner approval before applying the design. Saved feedback alone is not approval. Keep mock desktop bridges under prototype/, native code unchanged, and generated output/local registration ignored.
