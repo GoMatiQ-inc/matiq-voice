@@ -6,8 +6,9 @@ const size = bytes => `${(bytes / 1024 ** 3).toFixed(1)} GB`;
 let snapshot, state = 'idle', recorder = null, starting = false, generation = 0, currentPage = 'dictation';
 let setupStep = 0, setupBusy = false, selectedMeeting = null, meetingTab = 'transcript', captures = [], meetingStopping = false, captureGeneration = 0;
 const connecting = new Set();
-const message = text => { $('notice').textContent = text; $('notice').hidden = !text; };
-const cleanError = error => error.message.replace(/^Error invoking remote method '[^']+': Error: /, '');
+const permissionText = text => snapshot?.hosted ? String(text).replaceAll('MatiQ Voice.app', snapshot.applicationName + '.app') : text;
+const message = text => { $('notice').textContent = permissionText(text); $('notice').hidden = !text; };
+const cleanError = error => permissionText(error.message.replace(/^Error invoking remote method '[^']+': Error: /, ''));
 const showError = error => message(cleanError(error));
 function setupError(error) { $('setup-error').textContent = cleanError(error); $('setup-error').hidden = false; }
 function navigate(page) {
@@ -43,7 +44,7 @@ function paint() {
   $('installation').textContent = `Version ${snapshot.installation.version} · ${snapshot.installation.path}`;
   $('shortcut').textContent = `Toggle: ${bindingLabel(snapshot.settings.bindings.toggle)} · Hold: ${bindingLabel(snapshot.settings.bindings.hold)}`;
   for (const mode of ['toggle','hold']) $(`binding-${mode}`).textContent=bindingLabel(snapshot.settings.bindings[mode]);
-  $('shortcut-status').textContent = snapshot.shortcutReady ? 'Keyboard access active. Bindings work while MatiQ Voice is in the background.' : snapshot.keyboardError || 'Enable keyboard access to use background bindings.';
+  $('shortcut-status').textContent = snapshot.shortcutReady ? 'Keyboard access active. Bindings work while MatiQ Voice is in the background.' : permissionText(snapshot.keyboardError || 'Enable keyboard access to use background bindings.');
 }
 async function refresh() {
   snapshot = await api.status(); state = snapshot.state; paint();
