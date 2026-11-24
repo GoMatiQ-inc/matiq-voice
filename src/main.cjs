@@ -231,7 +231,7 @@ async function start(options) {
       const invalid=[];
       if(next.model!==settings.model)invalid.push('model','download');
       if(next.microphone!==settings.microphone)invalid.push('microphone-input','microphone');
-      if(next.autoPaste!==settings.autoPaste||JSON.stringify(next.bindings)!==JSON.stringify(settings.bindings))invalid.push('shortcuts','paste','permissions');
+      if((next.autoPaste&&!(await permissionStatus()).accessibility)||((next.bindings.toggle.length||next.bindings.hold.length)&&!keyboard.ready))invalid.push('permissions');
       if(invalid.length){await firstRun.invalidate(invalid);setup.completed=false;await saveJSON(setupFile,setup);}
       await saveJSON(settingsFile, next);
       settings = next; keyboard.configure(settings.bindings); updateTray(); return ready();

@@ -9,7 +9,7 @@ test('confirmed Quit saves validated audio before acknowledgement; failures stay
  const pending=quit.request();assert.equal(saved,false);
  await assert.rejects(quit.accept({token:'wrong',audio}),/matching/);
  const result=await quit.accept({token:event.token,audio});await pending;assert.equal(result.saved,true);assert.equal(saved,true);
- assert.equal((await fs.readdir(directory)).length,1);assert.equal((await fs.stat(path.join(directory,(await fs.readdir(directory))[0]))).mode&0o777,0o600);
+ assert.equal((await fs.readdir(directory)).length,1);if(process.platform!=='win32')assert.equal((await fs.stat(path.join(directory,(await fs.readdir(directory))[0]))).mode&0o777,0o600);
  const blocked=path.join(root,'blocked');await fs.writeFile(blocked,'fixture');
  const retry=createQuitSave({directory:blocked,send:value=>{event=value;},finishMeeting:async()=>{},afterSave:async()=>{}});
  const failed=retry.request();const failure=assert.rejects(failed,/EEXIST|ENOTDIR/);
