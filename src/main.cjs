@@ -2,6 +2,10 @@ const {app, BrowserWindow, Menu, Tray, nativeImage, globalShortcut, ipcMain, cli
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const {pathToFileURL} = require('node:url');
+const {createSetup}=require('@matiq-solutions/runtime/setup.cjs');
+const setupSteps=require('./setup-steps.json');
+const {stopRecordingsForQuit}=require('@matiq-solutions/runtime/quit-recordings.cjs');
+const {createQuitSave}=require('./quit-save.cjs');
 const {MODELS, DEFAULT_SETTINGS, MAX_SECONDS, validateSettings, validateWav} = require('./core.cjs');
 const {transcribe,run} = require('./engine.cjs');
 const {inspectHardware} = require('./hardware.cjs');
@@ -43,6 +47,15 @@ async function start(options) {
   let setup = {completed: false, microphoneTested: false, permissionsReviewed: false, launchAtLogin: false};
   try { setup = {...setup, ...JSON.parse(await fs.readFile(setupFile, 'utf8'))}; }
   catch (error) { if (error.code !== 'ENOENT') startupNotice += ' Setup progress was damaged; complete setup again.'; }
+  const firstRun=createSetup({file:path.join(dataDir,'first-run.json'),steps:setupSteps,
+    validateChoice:(step,value)=>step.id==='microphone-input'?typeof value==='string'&&value.length>0&&value.length<=512:step.options.some(option=>option[0]===value),
+    validate:async()=>{
+      const availability=await ready();
+      if(hardware.issues.length||!availability.engineReady||!availability.modelReady||!availability.speakerReady||!setup.microphoneTested)throw Error('Finish the device, model and microphone checks before using Voice.');
+      if(settings.autoPaste&&!(await permissionStatus()).accessibility)throw Error('Grant Accessibility for '+app.getName()+' or choose manual Copy.');
+      if((settings.bindings.toggle.length||settings.bindings.hold.length)&&!keyboard.ready)throw Error('Check keyboard access for '+app.getName()+' or choose on-screen controls.');
+    }});
+  const firstRunInitial=await firstRun.read();setup.completed=setup.completed&&firstRunInitial.completed;
   const familyModelRoot = host?.sharedModelRoot || options.sharedModelRoot || sharedRoot();
   let sharedModels = [];
   try { sharedModels = await adoptExistingAssets([...Object.keys(MODELS).map(speechAsset),...SPEAKER_MODELS],modelDir,familyModelRoot); }
@@ -135,9 +148,8 @@ async function start(options) {
   nativeUpdater.on('before-quit-for-update', () => { if (updates.installing) quitting = true; });
   app.on('activate', show); app.on('second-instance', show);
   app.on('before-quit', event => {
-    if (activeMeeting && ['meeting-recording', 'meeting-preparing', 'meeting-paused'].includes(state) && !quitting) { event.preventDefault(); send({type: 'quit-after-meeting'}); show(); return; }
     if(quitting)return;event.preventDefault();if(checkingClose)return;checkingClose=true;
-    prepareClose().then(async()=>{await dispose();quitting=true;app.quit();}).catch(async error=>{shuttingDown=disposed;if(!workspace.isDestroyed())await workspace.executeJavaScript('document.documentElement.inert=false');notice(error.message);show();}).finally(()=>{checkingClose=false;});
+    stopRecordingsForQuit({tools:[{name:'Voice',status:toolStatus,stopAndSave}],confirm:options=>dialog.showMessageBox(win,options)}).then(async approved=>{if(!approved)return;await prepareClose();await dispose();quitting=true;app.quit();}).catch(async error=>{shuttingDown=disposed;if(!workspace.isDestroyed())await workspace.executeJavaScript('document.documentElement.inert=false');notice(error.message);show();dialog.showErrorBox('Voice could not quit',error.message);}).finally(()=>{checkingClose=false;});
   });
   app.on('will-quit', () => { clearTimeout(updateTimer); clearInterval(updateInterval); updates.dispose(); keyboard.stop(); globalShortcut.unregisterAll(); });
   }
@@ -208,7 +220,7 @@ async function start(options) {
   handle('update-install', () => {setImmediate(()=>installUpdate().catch(error=>notice(error.message)));return {requested:true};});
   handle('status', async () => ({updates: updates.status, state, settings, models: MODELS, maxSeconds: MAX_SECONDS, lastTranscript, canRetry: Boolean(lastAudio), shortcutReady, keyboardError: keyboard.error, startupNotice, platform: process.platform, packaged: app.isPackaged, hosted:Boolean(host),applicationName:app.getName(),installation:{version:host?.manifest.version||app.getVersion(),path:app.isPackaged?app.getPath('exe'):app.getAppPath()},
     hardware, setup, sharedModels, familyModelRoot, permissions: await permissionStatus(), connections: await connections.status(), activeMeeting, ...(await ready())}));
-  handle('settings', async value => {
+  async function savePreferences(value) {
     if (state !== 'idle' || savingSettings) throw new Error('Wait for the current operation or preference save to finish.');
     savingSettings = true;
     try {
@@ -216,10 +228,16 @@ async function start(options) {
       if (next.microphone !== settings.microphone) {
         setup.microphoneTested = false; setup.completed = false; await saveJSON(setupFile, setup);
       }
+      const invalid=[];
+      if(next.model!==settings.model)invalid.push('model','download');
+      if(next.microphone!==settings.microphone)invalid.push('microphone-input','microphone');
+      if(next.autoPaste!==settings.autoPaste||JSON.stringify(next.bindings)!==JSON.stringify(settings.bindings))invalid.push('shortcuts','paste','permissions');
+      if(invalid.length){await firstRun.invalidate(invalid);setup.completed=false;await saveJSON(setupFile,setup);}
       await saveJSON(settingsFile, next);
       settings = next; keyboard.configure(settings.bindings); updateTray(); return ready();
     } finally { savingSettings = false; }
-  });
+  }
+  handle('settings', savePreferences);
   handle('binding-record', mode => {
     if (!['toggle','hold'].includes(mode) || state !== 'idle' || !workspaceFocused()) throw new Error('Open Settings and finish recording before choosing a binding.');
     keyboard.record(mode);
@@ -261,18 +279,52 @@ async function start(options) {
     if (peak < .005) throw new Error('No clear microphone signal was detected. Check the input, speak closer, and test again.');
     setup.microphoneTested = true; await saveJSON(setupFile, setup); return {peak};
   });
-  handle('setup-complete', async () => {
-    const availability = await ready();
-    if (hardware.issues.length || !availability.engineReady || !availability.modelReady || !availability.speakerReady || !setup.microphoneTested) throw new Error('Complete the device, download, and microphone checks before finishing setup.');
-    if (settings.autoPaste && !(await permissionStatus()).accessibility) throw new Error('Grant Accessibility permission or turn off automatic paste before finishing setup.');
-    setup.completed = true; setup.permissionsReviewed = true; setup.version = 1; await saveJSON(setupFile, setup); return setup;
+  async function completeSetup(){
+    const result=await firstRun.complete();setup.completed=true;setup.permissionsReviewed=true;setup.version=2;await saveJSON(setupFile,setup);return result;
+  }
+  handle('setup-complete',completeSetup);
+  handle('setup-flow',async value=>{
+    if(!value||typeof value!=='object')throw Error('Choose a setup action.');
+    if(value.command==='state')return {...await firstRun.read(),steps:setupSteps,applicationName:app.getName()};
+    if(value.command==='review'){
+      if(value.id==='model'&&Object.hasOwn(MODELS,value.value)){
+        if(value.value!==settings.model){await savePreferences({...settings,model:value.value});await firstRun.invalidate(['download']);}
+      }else if(value.id==='microphone-input'){
+        const microphone=value.value==='default'?'':value.value;
+        if(typeof microphone!=='string'||microphone.length>512)throw Error('Choose a valid microphone.');
+        if(microphone!==settings.microphone){await savePreferences({...settings,microphone});await firstRun.invalidate(['microphone']);}
+      }else if(value.id==='shortcuts'){
+        const bindings=value.value==='toggle'?{toggle:['ControlRight'],hold:[]}:value.value==='hold'?{toggle:[],hold:['ControlRight']}:{toggle:[],hold:[]};
+        if(!['toggle','hold','onscreen'].includes(value.value))throw Error('Choose valid dictation controls.');
+        await savePreferences({...settings,bindings});await firstRun.invalidate(['permissions']);
+      }else if(value.id==='paste'){
+        if(!['copy','paste'].includes(value.value))throw Error('Choose Copy or automatic paste.');
+        await savePreferences({...settings,autoPaste:value.value==='paste'});await firstRun.invalidate(['permissions']);
+      }else if(value.id==='meetings'&&value.value!=='none'){
+        if(!['microsoft','google'].includes(value.value))throw Error('Choose a configured calendar or skip connections.');
+        if(!(await connections.status())[value.value]?.connected)throw Error('Connect the chosen calendar before continuing, or choose Skip calendar connections.');
+      }
+      setup.completed=false;await saveJSON(setupFile,setup);return firstRun.review(value.id,value.value);
+    }
+    if(value.command==='check')return firstRun.check(value.id,async()=>{
+      if(value.id==='download'){const availability=await ready();if(!availability.engineReady||!availability.modelReady||!availability.speakerReady)throw Error('Download and verify the required models.');}
+      else if(value.id==='microphone'){if(!setup.microphoneTested)throw Error('Test the selected microphone before continuing.');}
+      else if(value.id==='permissions'){
+        if(settings.autoPaste&&!(await permissionStatus()).accessibility)throw Error('Enable Accessibility for '+app.getName()+', restart if macOS requests it, and check again.');
+        if((settings.bindings.toggle.length||settings.bindings.hold.length)&&!keyboard.ready)throw Error('Enable keyboard access for '+app.getName()+' or choose on-screen controls.');
+      }else throw Error('Choose a supported setup check.');
+    });
+    if(value.command==='progress')return firstRun.progress(value.step);
+    if(value.command==='complete')return completeSetup();
+    if(value.command==='reopen'){setup.completed=false;await saveJSON(setupFile,setup);return firstRun.reopen();}
+    throw Error('Unknown setup action.');
   });
   handle('login-at-startup', async enabled => { if(host)throw new Error('Suite startup is managed by MatiQ Solutions through your operating system login/startup items.');if (typeof enabled !== 'boolean' || !app.isPackaged) throw new Error('Launch at login is available in the installed MatiQ Voice app.'); app.setLoginItemSettings({openAtLogin: enabled}); setup.launchAtLogin = enabled; await saveJSON(setupFile, setup); });
   handle('begin', async () => {
     if (updates.installing) throw new Error('MatiQ Voice is restarting to update.');
     if (state !== 'idle') throw new Error('Finish the current operation first.');
     if (connections.pending.size) throw new Error('Finish or cancel account sign-in before recording.');
-    if (!setup.completed) throw new Error('Complete setup before dictating.');
+    await firstRun.assertReady();if (!setup.completed) throw new Error('Complete setup before dictating.');
     const ticket = ++generation; setState('preparing');
     try {
       const availability = await ready(); if (ticket !== generation) throw new Error('Recording was cancelled.');
@@ -296,6 +348,7 @@ async function start(options) {
   handle('open-meeting', async url => shell.openExternal(meetingURL(url)));
   handle('meeting-list', () => meetings.list()); handle('meeting-get', id => meetings.get(id));
   handle('meeting-begin', async value => {
+    await firstRun.assertReady();
     if (updates.installing) throw new Error('MatiQ Voice is restarting to update.');
     if (state !== 'idle' || !setup.completed) throw new Error('Complete setup and finish other recording before starting a meeting.');
     if (connections.pending.size) throw new Error('Finish or cancel account sign-in before recording.');
@@ -307,15 +360,12 @@ async function start(options) {
   handle('meeting-pause', paused => { if (!activeMeeting || typeof paused !== 'boolean' || !['meeting-recording', 'meeting-paused'].includes(state)) throw new Error('No meeting is recording.'); setState(paused ? 'meeting-paused' : 'meeting-recording'); });
   handle('meeting-stop', async (id, problem = '') => {
     if (id !== activeMeeting) throw new Error('This meeting is not recording.');
-    try {
-      const result = await meetings.stop(id);
-      if (problem) { result.status = 'interrupted'; result.error = String(problem).slice(0, 1000); await meetings.write(result); }
-      return result;
-    } finally {
-      activeMeeting = null;
-      if (awake !== null) { powerSaveBlocker.stop(awake); awake = null; }
-      setState('idle');
-    }
+    const result = await meetings.stop(id);
+    if (problem) { result.status = 'interrupted'; result.error = String(problem).slice(0, 1000); await meetings.write(result); }
+    activeMeeting = null;
+    if (awake !== null) { powerSaveBlocker.stop(awake); awake = null; }
+    setState('idle');
+    return result;
   });
   handle('meeting-process', async id => {
     if (state !== 'idle') throw new Error('Finish recording before processing a meeting.');
@@ -353,6 +403,20 @@ async function start(options) {
     const text = [`# ${meeting.title}`, '', '## Transcript', ...meeting.segments.map(segment => `${Math.floor(segment.startMs / 60000)}:${String(Math.floor(segment.startMs / 1000) % 60).padStart(2, '0')} ${meeting.speakers[segment.speaker] || 'Unassigned'}: ${segment.text}`), '', '## Personal notes', meeting.personalNotes, '', '## Extracted notes', ...(meeting.notes?.actions || []).map(note => `- ${note.text} [${Math.floor(note.startMs / 1000)}s]`) ].join('\n');
     await fs.writeFile(result.filePath, text, {mode: 0o600}); return true;
   });
+  const recoveryDirectory=path.join(dataDir,'recovered-dictation');
+  const quitSave=createQuitSave({directory:recoveryDirectory,send,
+    finishMeeting:async()=>{if(activeMeeting)throw Error('Meeting audio has not finished saving. Retry Stop, save, and quit.');},
+    afterSave:async file=>{
+      if(file){target?.cancel();target=null;lastAudio=null;setState('idle');}
+      await firstRun.idle();
+    }});
+  handle('save-before-quit',value=>quitSave.accept(value));
+  handle('open-saved-recordings',async()=>{await fs.mkdir(recoveryDirectory,{recursive:true,mode:0o700});const error=await shell.openPath(recoveryDirectory);if(error)throw Error(error);});
+  async function stopAndSave(){
+    if(['preparing','meeting-preparing'].includes(state))throw Error('Wait for recording to finish starting, then retry Quit.');
+    if(await workspace.executeJavaScript('Boolean(window.voiceCaptureStarting)'))throw Error('Wait for audio capture to finish starting, then retry Quit.');
+    await quitSave.request();
+  }
   handle('quit', () => {if(host)return host.close();setImmediate(()=>app.quit());return {requested:true};});
   try { await keyboard.start(); } catch (error) { startupNotice += ` ${error.message}`; }
   if (!globalShortcut.register('CommandOrControl+Alt+Backspace', () => send({type: 'cancel'}))) startupNotice += ' The cancel shortcut is unavailable. Use the app controls.';
@@ -360,7 +424,7 @@ async function start(options) {
     if(disposed)return {busy:false,background:true};
 
       const busy=()=>state!=='idle'||Boolean(activeMeeting||operation||lastAudio||savingSettings||connections.pending.size||keyboard.router.recording);
-      if(busy())return {busy:true,background:true,reason:state!=='idle'?state:lastAudio?'retry or clear retained audio':'finish pending work'};
+      if(busy())return {recording:['preparing','recording','meeting-preparing','meeting-recording','meeting-paused'].includes(state),busy:true,background:true,reason:state!=='idle'?state:lastAudio?'retry or clear retained audio':'finish pending work'};
       const editing=await workspace.executeJavaScript("Boolean([...document.querySelectorAll('#personal-notes,.speaker-row input')].some(input=>input.value!==input.defaultValue)||document.querySelector('#binding-dialog[open]'))");
       return {busy:busy()||editing,background:true,reason:editing?'save your meeting notes, speaker names or binding first':'finish pending work'};
 
@@ -398,7 +462,7 @@ async function start(options) {
       globalShortcut.unregister('CommandOrControl+Alt+Backspace');
       if(awake!==null)powerSaveBlocker.stop(awake);
       if(!forUpdate){hud.destroy();tray.destroy();}
-      await lease?.release();disposed=true;
+      await firstRun.idle();await lease?.release();disposed=true;
   }
   try {
   await hud.loadURL(hudURL); await workspace.loadURL(pageURL);
@@ -409,6 +473,7 @@ async function start(options) {
   } catch(error){await dispose();throw error;}
   return {
     status:toolStatus,
+    stopAndSave,
     onVisibility:visible=>{if(!visible&&keyboard.router.recording){keyboard.cancelRecord();send({type:'binding-cancelled',message:'Binding recording cancelled when you left Voice.'});}},
     dispose
   };

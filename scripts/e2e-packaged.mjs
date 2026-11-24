@@ -57,10 +57,9 @@ try {
   for (const provider of ['microsoft', 'google']) assert.equal(installedStatus.connections[provider].configured, Boolean(registrations[provider]?.clientId), `${provider} registration must survive packaging`);
 
   const speech = wavBytes(await fs.readFile(path.join(fixtures, 'jfk.wav')));
+  await require('./setup-fixture.cjs').completeSetupWithAudio(page,speech);
   await page.evaluate(async bytes => {
     const api = window.matiqVoice;
-    await api.settings({model:'base.en', autoPaste:false, microphone:''});
-    await api.microphoneTest(new Uint8Array(bytes)); await api.completeSetup();
     await api.begin(); await api.recordingReady(); await api.transcribe(new Uint8Array(bytes));
   }, speech);
   assert.match((await page.evaluate(() => window.matiqVoice.status())).lastTranscript, /ask not/i);

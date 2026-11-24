@@ -10,16 +10,21 @@ export async function captureAudio(stream, {onLevel = () => {}, onError = () => 
     source = context.createMediaStreamSource(stream); node = new AudioWorkletNode(context, 'matiq-recorder');
   } catch (error) { stream.getTracks().forEach(track => track.stop()); await context.close(); throw error; }
   let chunks = [], count = 0, total = 0, sequence = 0, pending = Promise.resolve(), failure = null, closed = false, stopping = null, lastMeter = 0;
+  const undelivered=[];
   let resolveStarted; const firstFrame = new Promise(resolve => { resolveStarted = resolve; });
   let commandNumber = 0; const acknowledgements = new Map();
   function flush() {
     if (!count) return;
     const wav = encodeWav(chunks); chunks = []; count = 0;
     if (onChunk) {
-      const current = sequence++;
-      pending = pending.then(() => { if (failure) throw failure; return onChunk(current, wav); }).catch(error => { if (!failure) { failure = error; onError(error); } });
+      undelivered.push({sequence:sequence++,wav});
+      pending = pending.then(()=>{if(failure)throw failure;return deliver();}).catch(error => { if (!failure) { failure = error; onError(error); } });
     }
     return wav;
+  }
+  async function deliver() {
+    while(undelivered.length){const chunk=undelivered[0];await onChunk(chunk.sequence,chunk.wav);undelivered.shift();}
+    failure=null;
   }
   function command(value) {
     return new Promise((resolve, reject) => {
@@ -29,7 +34,7 @@ export async function captureAudio(stream, {onLevel = () => {}, onError = () => 
   }
   node.port.onmessage = ({data}) => {
     if (data.ack) { acknowledgements.get(data.ack)?.(); acknowledgements.delete(data.ack); return; }
-    if (closed || failure) return;
+    if (closed) return;
     const samples = data.samples.subarray(0, Math.max(0, maxSeconds * 16000 - total));
     if (!samples.length) return;
     chunks.push(samples); count += samples.length; total += samples.length;
@@ -54,12 +59,15 @@ export async function captureAudio(stream, {onLevel = () => {}, onError = () => 
     async pause(paused) { await command({command: 'pause', paused}); if (onChunk) { flush(); await pending; if (failure) throw failure; } },
     stop() {
       if (stopping) return stopping;
+      if (closed) return deliver();
       stopping = (async () => {
         let audio;
         try { await command({command: 'stop'}); audio = flush(); await pending; if (failure) throw failure; return audio; }
         finally { closed = true; stream.getTracks().forEach(track => track.stop()); source.disconnect(); node.disconnect(); await context.close(); }
       })();
-      return stopping;
+      const result=stopping;
+      result.catch(()=>{stopping=null;});
+      return result;
     }
   };
 }

@@ -1,4 +1,7 @@
 {
-  "status": "draft",
-  "instruction": "The prototype is under owner review. Do not apply prototype design changes to the desktop app until explicitly approved."
+  "status": "approved",
+  "approvedBy": "Repository owner",
+  "approvalText": "Apply the setup prototype to Voice and Copycat, update the SDK so all new tools require setup, and finish testing and releasing the Copycat quit fix.",
+  "approvedAt": "2026-11-24T23:50:31.790Z",
+  "digest": "8ecfcc08a53c46f25cd7d7f23ca7f0933b6199d6a8b5dd1858b17857023c1784"
 }
