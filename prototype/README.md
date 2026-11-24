@@ -7,3 +7,13 @@ Run matiq-tool prototype build --suite <solutions-checkout> --shell <shared-shel
 Review both modes. Feedback is not approval. After explicit owner approval, record the actual instruction with prototype approve --by and --approval-text. Changes to renderer, bridge, manifest or shared shell invalidate approval. Browser prototypes do not qualify native audio, inference, OS permissions or installers.
 
 After SDK 0.1.4 is published, use `npm run prototype -- --suite <solutions-checkout>` (or set `MATIQ_SOLUTIONS_PROTOTYPE`). No native dependency build, model download or installed application is required for the browser preview.
+
+
+## First-run setup review
+
+The bridge invokes the shared `setup-preview.js` helper with Voice-owned steps.
+Models, microphone tests and permission checks are simulated and never affect
+the device. Setup choices and progress persist in the preview per hosted or
+standalone mode. Finish later blocks normal tool use and supports reopening.
+This proposed setup flow is not production approval and is not in the 0.3.14
+model download hotfix. Build with the draft Solutions source SDK and shell.
