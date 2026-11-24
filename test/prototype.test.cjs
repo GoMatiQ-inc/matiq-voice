@@ -14,13 +14,13 @@ test("prototype capture and account actions cannot invoke a real microphone or a
     },
   };
   const sandbox = {
-    window: {},
+    window: {addEventListener() {}},
     location: { search: "?mode=hosted" },
     URLSearchParams,
     structuredClone,
     EventTarget,
     navigator,
-    document: { addEventListener() {} },
+    document: {currentScript: {src: "https://example.invalid/prototype/bridge.js"}, addEventListener() {} },
   };
   vm.runInNewContext(
     fs.readFileSync(path.join(__dirname, "../prototype/bridge.js"), "utf8"),
@@ -29,6 +29,8 @@ test("prototype capture and account actions cannot invoke a real microphone or a
   const api = sandbox.window.matiqVoice,
     events = [];
   api.onEvent((e) => events.push(e));
+  await assert.rejects(api.begin(), /Finish Voice setup/);
+  sandbox.window.matiqPrototypeSetupReady = true;
   await api.begin();
   await api.recordingReady();
   await api.transcribe();
