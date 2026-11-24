@@ -396,3 +396,23 @@ and advanced beyond zero on both; tests were cancelled without transcription
 or saving audio. Preferences/setup hashes and all three model files' hashes,
 byte counts and timestamps are unchanged. These checks establish installed
 capture-clock operation, not speech-content accuracy or direct Codex insertion.
+
+
+## Speaker model download repair — 2026-11-24
+
+The upstream speaker-embedding release asset was replaced on November 19.
+The old catalog expected 26,485,263 bytes; the replacement is 26,485,264 bytes
+with SHA-256 `c4947caf150b8502fdd75bbe4089b971ab1ec42e90ee3ba547faca2cde44d9ee`.
+A streamed download independently matched the GitHub release asset digest.
+The Medium English catalog is unchanged. Its setup failed because setup also
+installs both speaker models. Catalog verification remains mandatory.
+
+On Linux, 63 unit tests passed, including changed-size and wrong-hash rejection,
+failed-download cleanup, verified retry and cache reuse through the shared model
+path. A real upstream download reproduced the old-catalog failure; Medium English
+and both current speaker models then downloaded and verified through the shared
+suite storage path. A standalone profile reused Medium offline. Native sherpa
+diarization with the replacement embedding model produced four segments on the
+upstream two-speaker fixture. Disposable models were removed after qualification.
+These checks do not establish physical microphone capture or an installed Mac
+update; native packaged release checks remain required before publication.
