@@ -7,7 +7,7 @@ const path = require('node:path');
 
 const SPEAKER_MODELS = Object.freeze([
   {file: 'speaker-segmentation.onnx', bytes: 5992913, sha256: '220ad67ca923bef2fa91f2390c786097bf305bceb5e261d4af67b38e938e1079', url: 'https://huggingface.co/csukuangfj/sherpa-onnx-pyannote-segmentation-3-0/resolve/main/model.onnx'},
-  {file: 'speaker-embedding.onnx', bytes: 26485263, sha256: 'c59158379255ad66e161679cca6af8d52d51e389e3224ab7d7a7baae295c2db5', url: 'https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_eres2net_sv_en_voxceleb_16k.onnx'}
+  {file: 'speaker-embedding.onnx', bytes: 26485264, sha256: 'c4947caf150b8502fdd75bbe4089b971ab1ec42e90ee3ba547faca2cde44d9ee', url: 'https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_eres2net_sv_en_voxceleb_16k.onnx'}
 ]);
 async function verifyAsset(filename, asset) {
   try {
@@ -29,14 +29,14 @@ async function downloadAsset(asset, directory, progress, signal) {
     let received = 0, last = -1; const hash = createHash('sha256');
     const meter = new Transform({transform(chunk, encoding, callback) {
       received += chunk.length;
-      if (received > asset.bytes) return callback(new Error('Model download exceeds the verified size. Retry.'));
+      if (received > asset.bytes) return callback(new Error(`Model download exceeds the verified size for ${asset.file} (expected ${asset.bytes} bytes). The upstream file may have changed. Check for a Voice update and retry.`));
       hash.update(chunk);
       const percent = Math.floor(received / asset.bytes * 100);
       if (percent !== last) { last = percent; progress(percent); }
       callback(null, chunk);
     }});
     await pipeline(Readable.fromWeb(response.body), meter, createWriteStream(partial, {mode: 0o600}), {signal});
-    if (received !== asset.bytes || hash.digest('hex') !== asset.sha256) throw new Error('Model verification failed. Download again.');
+    if (received !== asset.bytes || hash.digest('hex') !== asset.sha256) throw new Error(`Model verification failed for ${asset.file}. Check for a Voice update and download again.`);
     await fs.rename(partial, destination);
   } finally { await fs.rm(partial, {force: true}); }
 }
