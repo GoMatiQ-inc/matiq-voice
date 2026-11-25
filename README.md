@@ -63,8 +63,8 @@ works offline. Optional calendar connections require internet access.
 
 ### Required setup and recording Quit
 
-Version0.3.15 requires setup before dictation or meetings, both standalone and
-inside **MatiQ Solutions0.1.3 or newer**. Review the model, download verification,
+Version 0.3.15 requires setup before dictation or meetings, both standalone and
+inside **MatiQ Solutions 0.1.3 or newer**. Review the model, download verification,
 microphone input and signal, controls, paste behavior, permissions, optional
 calendars and startup settings. **Finish later** saves progress; reopening resumes
 setup. Optional calendar accounts remain optional. On-screen controls and manual

@@ -5,12 +5,12 @@ platform and distribution qualification.
 
 ## Required setup and recording Quit — 2026-11-24
 
-[Voice0.3.15 release](https://github.com/GoMatiQ-inc/matiq-voice/releases/tag/v0.3.15)
-comes from source8bca4c926b93e95b0da4801ea8e94d3ae1611a6a.
-[Run45525673340](https://github.com/GoMatiQ-inc/matiq-voice/actions/runs/45525673340)
+[Voice 0.3.15 release](https://github.com/GoMatiQ-inc/matiq-voice/releases/tag/v0.3.15)
+comes from source `8bca4c926b93e95b0da4801ea8e94d3ae1611a6a`.
+[Run 45525673340](https://github.com/GoMatiQ-inc/matiq-voice/actions/runs/45525673340)
 passed both Mac and Windows desktop checks, protected Mac signing/notarization,
-packaged inference and actual hosted package qualification in Solutions0.1.3.
-Publication45527071468 succeeded. SDK/runtime/shell0.1.7 and Electron45.2.3 are
+packaged inference and actual hosted package qualification in Solutions 0.1.3.
+Publication run 45527071468 succeeded. SDK/runtime/shell 0.1.7 and Electron 45.2.3 are
 used by both forms.
 
 The automated recording Quit journey verifies warning/cancellation, a controlled
