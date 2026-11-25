@@ -143,18 +143,19 @@ async function initializeSetup(){
   },onComplete:async()=>{await refresh();message('Setup complete. Voice is ready.');}});
 }
 async function saveRecordingBeforeQuit(token){
+  let saved=false;
   try{
     if(starting||meetingStopping)throw Error('Recording is still starting or saving. Wait a moment and retry Quit.');
     if(snapshot.activeMeeting)await stopMeeting(null,false);
     else if(recorder){starting=true;window.voiceCaptureStarting=true;pendingQuitAudio=await recorder.stop();recorder=null;}
     const result=await api.saveBeforeQuit({token,...(pendingQuitAudio?{audio:pendingQuitAudio}:{})});
     if(!result.saved)throw Error('Recording was not saved. Keep Voice open and retry Quit.');
-    pendingQuitAudio=null;
+    pendingQuitAudio=null;saved=true;
   }catch(error){
     // Retain the WAV and capture objects until a durable save has acknowledged them.
     await api.saveBeforeQuit({token,error:cleanError(error)}).catch(()=>{});
     showError(error);
-  }finally{starting=false;window.voiceCaptureStarting=false;await refresh();}
+  }finally{starting=false;window.voiceCaptureStarting=false;if(!saved)await refresh();}
 }
 async function begin() {
   if(pendingQuitAudio){message('A recording still needs saving. Retry Quit to save it before starting another recording.');return;}
