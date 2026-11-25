@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('matiqVoice', {
   begin: invoke('begin'), recordingReady: invoke('recording-ready'), transcribe: invoke('transcribe'),
   retry: invoke('retry'), cancel: invoke('cancel'), copy: invoke('copy'), clear: invoke('clear'),
   accessibility: invoke('accessibility'), meter: invoke('meter'),
+  openSavedRecordings: invoke('open-saved-recordings'), setupFlow: invoke('setup-flow'), saveBeforeQuit: invoke('save-before-quit'),
   microphoneTest: invoke('setup-microphone-test'), completeSetup: invoke('setup-complete'), loginAtStartup: invoke('login-at-startup'),
   connect: invoke('oauth-connect'), cancelConnect: invoke('oauth-cancel'), disconnect: invoke('oauth-disconnect'), calendarEvents: invoke('calendar-events'), openMeeting: invoke('open-meeting'),
   listMeetings: invoke('meeting-list'), getMeeting: invoke('meeting-get'), beginMeeting: invoke('meeting-begin'), meetingReady: invoke('meeting-ready'),

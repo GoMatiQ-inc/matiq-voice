@@ -1,0 +1,134 @@
+[
+  {
+    "id": "model",
+    "title": "Choose your speech model",
+    "body": "Models stay on this computer. Choose a size for its memory and processing power.",
+    "kind": "choice",
+    "label": "English speech model",
+    "options": [
+      [
+        "base.en",
+        "Base English · lighter"
+      ],
+      [
+        "small.en",
+        "Small English · balanced"
+      ],
+      [
+        "medium.en",
+        "Medium English · more demanding"
+      ]
+    ]
+  },
+  {
+    "id": "download",
+    "title": "Install and verify models",
+    "body": "Download the chosen speech model and speaker-label models. Every file must pass its size and SHA-256 checks. A failure stays here for retry.",
+    "kind": "check",
+    "action": "Download and verify models",
+    "success": "Speech and speaker models verified."
+  },
+  {
+    "id": "microphone-input",
+    "title": "Choose your microphone",
+    "body": "Select the input to use for dictation and microphone audio in meetings.",
+    "kind": "choice",
+    "label": "Microphone",
+    "options": [
+      [
+        "default",
+        "System default"
+      ]
+    ]
+  },
+  {
+    "id": "microphone",
+    "title": "Choose and test your microphone",
+    "body": "Confirm that Voice receives an audio signal before dictation is enabled. The short test is not saved.",
+    "kind": "check",
+    "action": "Test microphone",
+    "success": "Audio signal detected."
+  },
+  {
+    "id": "shortcuts",
+    "title": "Choose your dictation controls",
+    "body": "Review toggle and push-to-talk bindings. You can also choose on-screen controls without global keyboard access. Custom bindings remain configurable in Settings.",
+    "kind": "choice",
+    "label": "Dictation controls",
+    "options": [
+      [
+        "toggle",
+        "Right Control toggles dictation; push-to-talk off"
+      ],
+      [
+        "hold",
+        "Hold Right Control to talk; toggle off"
+      ],
+      [
+        "onscreen",
+        "On-screen controls; both global bindings off"
+      ]
+    ]
+  },
+  {
+    "id": "paste",
+    "title": "Choose text insertion",
+    "body": "Copy mode keeps results ready for manual paste. Automatic insertion requires Accessibility access for {app}.",
+    "kind": "choice",
+    "label": "Text insertion",
+    "options": [
+      [
+        "copy",
+        "Copy results manually"
+      ],
+      [
+        "paste",
+        "Automatic paste after shortcut dictation"
+      ]
+    ]
+  },
+  {
+    "id": "permissions",
+    "title": "Review keyboard and paste permissions",
+    "body": "Check access required by your chosen controls and text insertion for {app}. Unused permissions remain off.",
+    "kind": "check",
+    "permission": true,
+    "action": "Check required permissions",
+    "success": "Required access verified; unused capabilities remain off.",
+    "help": "In System Settings → Privacy & Security, enable {app}. If macOS requests a restart, quit and reopen {app}, then check again. Setup resumes here."
+  },
+  {
+    "id": "meetings",
+    "title": "Review meeting settings",
+    "body": "Calendar connections are optional. Meeting recording always asks for local audio retention and system audio access when needed. No recording bot joins calls.",
+    "kind": "choice",
+    "label": "Calendar integration",
+    "options": [
+      [
+        "none",
+        "Skip calendar connections"
+      ],
+      [
+        "microsoft",
+        "Connect Microsoft calendar"
+      ],
+      [
+        "google",
+        "Connect Google calendar"
+      ]
+    ]
+  },
+  {
+    "id": "startup",
+    "title": "Review startup and updates",
+    "body": "{app} manages startup and updates. Closing the window can leave background tools running; Quit stops them after active work is saved.",
+    "kind": "review",
+    "label": "I reviewed startup, update ownership, and how to quit."
+  },
+  {
+    "id": "ready",
+    "title": "Ready to use Voice",
+    "body": "Setup is complete only after required checks and all settings choices. You can change these later in Settings.",
+    "kind": "summary"
+  }
+]

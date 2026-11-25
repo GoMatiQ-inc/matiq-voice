@@ -1,16 +1,17 @@
+import {mountSetup} from '../../node_modules/@matiq-solutions/shell/setup.mjs';
 import {captureAudio, microphone} from './capture.mjs';
 const api = window.matiqVoice, $ = id => document.getElementById(id);
 const escape = value => String(value ?? '').replace(/[&<>"']/g, character => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[character]));
 const formatTime = seconds => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds) % 60).padStart(2, '0')}`;
 const size = bytes => `${(bytes / 1024 ** 3).toFixed(1)} GB`;
 let snapshot, state = 'idle', recorder = null, starting = false, generation = 0, currentPage = 'dictation';
-let setupStep = 0, setupBusy = false, selectedMeeting = null, meetingTab = 'transcript', captures = [], meetingStopping = false, captureGeneration = 0;
+let setupController, pendingQuitAudio=null;
+let selectedMeeting = null, meetingTab = 'transcript', captures = [], meetingStopping = false, captureGeneration = 0;
 const connecting = new Set();
 const permissionText = text => snapshot?.hosted ? String(text).replaceAll('MatiQ Voice.app', snapshot.applicationName + '.app') : text;
 const message = text => { $('notice').textContent = permissionText(text); $('notice').hidden = !text; };
 const cleanError = error => permissionText(error.message.replace(/^Error invoking remote method '[^']+': Error: /, ''));
 const showError = error => message(cleanError(error));
-function setupError(error) { $('setup-error').textContent = cleanError(error); $('setup-error').hidden = false; }
 function navigate(page) {
   currentPage = page;
   for (const element of document.querySelectorAll('.page')) element.hidden = element.id !== `page-${page}`;
@@ -35,7 +36,7 @@ function paint() {
   $('launch-login').disabled = !snapshot.packaged || snapshot.hosted;
   $('launch-login').parentElement.hidden = Boolean(snapshot.hosted);
   if(snapshot.hosted){$('startup-help').textContent='Suite startup is managed in your operating system login/startup items. Open Voice in the suite to enable its background controls. Close Voice stops this tool; Quit MatiQ Solutions stops the suite.';$('quit-app').textContent='Close Voice';}
-  $('quit-app').disabled = !idle || starting;
+  $('quit-app').disabled = starting;
   const update = snapshot.updates;
   $('update-status').textContent = update.message;
   $('update-check').disabled = update.restartPending || ['disabled', 'checking', 'downloading', 'ready', 'installing'].includes(update.phase);
@@ -92,67 +93,74 @@ function renderConnections(target) {
     button.dataset.provider = id;
     button.onclick = async () => {
       if (connecting.has(id)) { await api.cancelConnect(id); return; }
-      if (account.connected || account.hasCredentials) { try { const result = await api.disconnect(id); await refresh(); message(result.message); if ($('setup-dialog').open) renderSetup(); } catch (error) { showError(error); } return; }
+      if (account.connected || account.hasCredentials) { try { const result = await api.disconnect(id); await refresh(); message(result.message);  } catch (error) { showError(error); } return; }
       connecting.add(id); renderConnections(target);
       try { await api.connect(id); await refresh(); message('Account connected. You can refresh upcoming meetings.'); }
-      catch (error) { if ($('setup-dialog').open) setupError(error); else showError(error); }
+      catch (error) { showError(error); }
       finally { connecting.delete(id); renderConnections(target); }
     };
     row.append(button); target.append(row);
   }
 }
 function openSetup() {
-  if (state !== 'idle') { message('Finish the current operation before running setup.'); return; }
-  setupStep = 0; $('setup-dialog').showModal(); renderSetup();
+  if(state!=='idle'){message('Finish the current operation before running setup.');return;}
+  setupController?.open().catch(showError);
 }
-function renderSetup() {
-  const content = $('setup-content'), h = snapshot.hardware;
-  $('setup-error').hidden = true; $('setup-progress').textContent = `Step ${setupStep + 1} of 6`;
-  $('setup-back').disabled = setupStep === 0 || setupBusy; $('setup-next').disabled = setupBusy;
-  $('setup-next').textContent = setupStep === 5 ? 'Finish setup' : 'Continue';
-  const titles = ['Check this computer', 'Install local models', 'Test your microphone', 'Set up text insertion', 'Connect your meetings', 'You’re ready'];
-  $('setup-title').textContent = titles[setupStep];
-  const introductions = ['We check memory, processor, disk space, and the bundled speech engine.', 'Models download once. The application and native software are already bundled.', 'Speak a short sentence. We check for a real audio signal; the test is not saved.', 'MatiQ Voice uses your original text field and keeps a copyable result if insertion fails.', 'Optional: connect calendars through your browser. Audio and transcripts stay local.', 'Dictation runs in the background. Closing the window keeps the menu-bar or tray icon.'];
-  $('setup-intro').textContent = introductions[setupStep];
-  if (setupStep === 0) {
-    content.innerHTML = `<div class="device-grid">${deviceHTML()}</div><p class="caption">${escape(h.recommendation.reason)} ${escape(h.recommendation.performanceNote)}</p>${h.issues.map(issue => `<p class="error">${escape(issue)}</p>`).join('')}`;
-    $('setup-next').disabled ||= h.issues.length > 0;
-  } else if (setupStep === 1) {
-    content.innerHTML = `<label for="setup-model">English speech model</label><select id="setup-model">${Object.entries(snapshot.models).map(([id, model]) => `<option value="${id}" ${id === snapshot.settings.model ? 'selected' : ''}>${escape(model.label)}</option>`).join('')}</select><p class="caption">Recommended: ${escape(h.recommendation.model)}. Speaker-label models add 33 MB. Downloads are verified by SHA-256.</p><button id="setup-download" class="primary" ${setupBusy ? 'disabled' : ''}>${snapshot.modelReady && snapshot.speakerReady ? 'Verify installed models' : 'Download recommended components'}</button><progress id="setup-download-progress" max="100" value="0"></progress><p id="setup-download-label" class="caption">${snapshot.modelReady && snapshot.speakerReady ? 'All required models are installed.' : 'Internet is needed for the download.'}</p>`;
-    $('setup-model').onchange = async () => { try { $('model').value = $('setup-model').value; await savePreferences(); renderSetup(); } catch (error) { setupError(error); } };
-    $('setup-download').onclick = async () => {
-      setupBusy = true; renderSetup();
-      try { await api.download(); await refresh(); setupBusy = false; renderSetup(); }
-      catch (error) { await refresh(); setupBusy = false; renderSetup(); setupError(error); }
-    };
-    $('setup-next').disabled ||= !snapshot.modelReady || !snapshot.speakerReady;
-  } else if (setupStep === 2) {
-    content.innerHTML = `<p>Current input: ${escape($('microphone').selectedOptions[0]?.textContent || 'System default')}</p><button id="setup-test-microphone" ${setupBusy ? 'disabled' : ''}>${setupBusy ? 'Listening to the microphone…' : 'Test microphone'}</button><progress id="setup-microphone-level" max="1" value="0"></progress><p class="caption">${snapshot.setup.microphoneTested ? 'Audio signal detected. You can continue.' : 'The test listens for two seconds. Check your selected microphone in Settings if necessary.'}</p>`;
-    $('setup-test-microphone').onclick = async () => {
-      setupBusy = true; renderSetup(); let capture;
-      try { capture = await captureAudio(await microphone(snapshot.settings.microphone), {maxSeconds: 5, onLevel: level => { const meter = $('setup-microphone-level'); if (meter) meter.value = level; }}); const deadline = performance.now() + 10000; while (capture.seconds < 2 && performance.now() < deadline) await new Promise(resolve => setTimeout(resolve, 100)); if (capture.seconds < 2) throw new Error('The microphone is not supplying audio quickly enough. Check the selected input and test again.'); await api.microphoneTest(await capture.stop()); capture = null; await refresh(); setupBusy = false; renderSetup(); }
-      catch (error) { await capture?.stop().catch(() => {}); setupBusy = false; renderSetup(); setupError(error); }
-    };
-    $('setup-next').disabled ||= !snapshot.setup.microphoneTested;
-  } else if (setupStep === 3) {
-    content.innerHTML = `<p>${snapshot.platform === 'darwin' ? 'Accessibility permission allows MatiQ Voice to send a paste shortcut to the destination app.' : 'Windows can reject insertion into protected or administrator-level apps. Copy remains available.'}</p><div class="field-row"><button id="setup-permission">Open paste permissions</button><button id="setup-permission-refresh">Check again</button></div><label class="check"><input id="setup-copy-only" type="checkbox" ${snapshot.settings.autoPaste ? '' : 'checked'}> Use Copy for now</label><p class="caption">${snapshot.permissions.pasteError || (snapshot.permissions.accessibility ? 'The native paste helper has Accessibility access. Changed or unsupported target fields can still require Copy.' : 'The native paste helper does not have Accessibility access. Enable the installed MatiQ Voice app, then click Check again. If an old entry is already enabled, remove it, add the installed app again, and restart MatiQ Voice.')}</p>`;
-    if (snapshot.hosted) content.querySelectorAll('p').forEach(paragraph => { paragraph.textContent = paragraph.textContent.replaceAll('MatiQ Voice', snapshot.applicationName); });
-    $('setup-permission').onclick = () => api.accessibility().catch(setupError);
-    $('setup-permission-refresh').onclick = async () => { await refresh(); renderSetup(); };
-    $('setup-copy-only').onchange = async event => { $('autoPaste').checked = !event.target.checked; await savePreferences(); renderSetup(); };
-    $('setup-next').disabled ||= snapshot.settings.autoPaste && !snapshot.permissions.accessibility;
-  } else if (setupStep === 4) { content.innerHTML = '<div id="setup-connections"></div><p class="caption">Connections are optional. Local recording works without calendar access. Connecting a calendar does not create an independently joining meeting bot.</p>'; renderConnections($('setup-connections')); }
-  else content.innerHTML = `<ul class="setup-step-list"><li>English speech model <small>${escape(snapshot.settings.model)} installed and verified</small></li><li>Speaker labels <small>Local segmentation and English speaker-embedding models installed</small></li><li>Microphone <small>Audio input tested</small></li><li>Background dictation <small>${escape(bindingLabel(snapshot.settings.bindings.toggle))} toggles dictation</small></li></ul><p class="caption">Meeting audio is saved locally only when you explicitly start recording. Recognition and speaker labels can still contain errors.</p>`;
+$('open-setup').onclick=openSetup;
+async function initializeSetup(){
+  const definition=await api.setupFlow({command:'state'});
+  const steps=definition.steps.map(step=>({...step,body:step.body.replaceAll('{app}',definition.applicationName),help:step.help?.replaceAll('{app}',definition.applicationName)}));
+  const input=steps.find(step=>step.id==='microphone-input');
+  input.options=[...$('microphone').options].map(option=>[option.value||'default',option.textContent]);
+  if(snapshot.settings.microphone&&!input.options.some(option=>option[0]===snapshot.settings.microphone))input.options.push([snapshot.settings.microphone,'Previously selected input (test availability)']);
+  setupController=await mountSetup({name:'Voice',steps,api:{
+    read:()=>api.setupFlow({command:'state'}),
+    review:async(id,value)=>{
+      if(id==='meetings'&&value!=='none'&&!snapshot.connections[value]?.connected){await api.connect(value);await refresh();}
+      const result=await api.setupFlow({command:'review',id,value});await refresh();return result;
+    },
+    check:async id=>{
+      if(id==='download')await api.download();
+      if(id==='microphone'&&!api.prototype){
+        let capture;
+        try{
+          capture=await captureAudio(await microphone(snapshot.settings.microphone),{maxSeconds:5});
+          const deadline=performance.now()+10000;
+          while(capture.seconds<2&&performance.now()<deadline)await new Promise(resolve=>setTimeout(resolve,100));
+          if(capture.seconds<2)throw Error('Check the selected microphone and test again; it is not supplying audio.');
+          await api.microphoneTest(await capture.stop());capture=null;
+        }finally{await capture?.stop();}
+      }
+      if(id==='permissions'){
+        if(snapshot.settings.autoPaste&&!snapshot.permissions.accessibility)await api.accessibility();
+        if(snapshot.settings.bindings.toggle.length||snapshot.settings.bindings.hold.length)await api.enableKeyboard();
+      }
+      const result=await api.setupFlow({command:'check',id});await refresh();return result;
+    },
+    progress:step=>api.setupFlow({command:'progress',step}),
+    complete:()=>api.setupFlow({command:'complete'}),
+    reopen:()=>api.setupFlow({command:'reopen'})
+  },onComplete:async()=>{await refresh();message('Setup complete. Voice is ready.');}});
 }
-$('setup-next').onclick = async () => { try { if (setupStep === 5) { await api.completeSetup(); await refresh(); $('setup-dialog').close(); message('Setup complete. Start dictation from any text field with your shortcut.'); } else { setupStep++; renderSetup(); } } catch (error) { setupError(error); } };
-$('setup-back').onclick = () => { if (!setupBusy && setupStep > 0) { setupStep--; renderSetup(); } };
-$('setup-close').onclick = () => { if (!setupBusy) $('setup-dialog').close(); };
-$('setup-dialog').addEventListener('cancel', event => { if (setupBusy) event.preventDefault(); });
-$('open-setup').onclick = openSetup;
+async function saveRecordingBeforeQuit(token){
+  try{
+    if(starting||meetingStopping)throw Error('Recording is still starting or saving. Wait a moment and retry Quit.');
+    if(snapshot.activeMeeting)await stopMeeting(null,false);
+    else if(recorder){starting=true;window.voiceCaptureStarting=true;pendingQuitAudio=await recorder.stop();recorder=null;}
+    const result=await api.saveBeforeQuit({token,...(pendingQuitAudio?{audio:pendingQuitAudio}:{})});
+    if(!result.saved)throw Error('Recording was not saved. Keep Voice open and retry Quit.');
+    pendingQuitAudio=null;
+  }catch(error){
+    // Retain the WAV and capture objects until a durable save has acknowledged them.
+    await api.saveBeforeQuit({token,error:cleanError(error)}).catch(()=>{});
+    showError(error);
+  }finally{starting=false;window.voiceCaptureStarting=false;paint();}
+}
 async function begin() {
+  if(pendingQuitAudio){message('A recording still needs saving. Retry Quit to save it before starting another recording.');return;}
   if (starting || recorder || state !== 'idle') return;
   if (!snapshot.setup.completed) { openSetup(); return; }
-  shortcutStopPending=false; starting = true; const ticket = ++generation; paint(); message(''); let capture;
+  shortcutStopPending=false; starting = true; window.voiceCaptureStarting=true; const ticket = ++generation; paint(); message(''); let capture;
   try {
     await api.begin(); if (ticket !== generation) return;
     const stream = await microphone(snapshot.settings.microphone);
@@ -161,7 +169,7 @@ async function begin() {
     if (ticket !== generation) { await capture.stop(); return; }
     recorder = capture; await api.recordingReady();
   } catch (error) { await capture?.stop().catch(() => {}); recorder = null; if (ticket === generation) { await api.cancel(); showError(error); await refresh(); } }
-  finally { if (ticket === generation) starting = false; paint(); if (shortcutStopPending && recorder) { shortcutStopPending=false; await finish(); } }
+  finally { if (ticket === generation) starting = false; window.voiceCaptureStarting=false; paint(); if (shortcutStopPending && recorder) { shortcutStopPending=false; await finish(); } }
 }
 async function finish() {
   if (!recorder || starting) return;
@@ -173,7 +181,7 @@ async function finish() {
 async function cancel() {
   shortcutStopPending=false;
   if (state.startsWith('meeting')) { if (state === 'meeting-processing') await api.cancel(); else await stopMeeting(); return; }
-  generation++; const recording = recorder; recorder = null; await recording?.stop().catch(() => {}); await api.cancel(); starting = false; await refresh(); message('Dictation cancelled.');
+  pendingQuitAudio=null;generation++; const recording = recorder; recorder = null; await recording?.stop().catch(() => {}); await api.cancel(); starting = false; await refresh(); message('Dictation cancelled.');
 }
 async function toggle() { if (starting) { if (state !== 'processing') shortcutStopPending=true; return; } if (recorder) await finish(); else if (state === 'idle') await begin(); else message('Finish the current operation before dictating.'); }
 async function loadMeetings() {
@@ -254,8 +262,10 @@ async function stopMeeting(problem = null, processSaved = true) {
   if (meetingStopping || !snapshot?.activeMeeting || state === 'meeting-processing') return;
   meetingStopping = true; captureGeneration++; const id = snapshot.activeMeeting;
   try {
-    const results = await Promise.allSettled(captures.map(capture => capture.stop())); captures = [];
-    const failed = results.find(result => result.status === 'rejected'); if (failed) problem ||= failed.reason;
+    const results = await Promise.allSettled(captures.map(capture => capture.stop()));
+    const failed = results.find(result => result.status === 'rejected');
+    if(failed){showError(failed.reason);throw failed.reason;}
+    captures = [];
     selectedMeeting = await api.stopMeeting(id, problem?.message || ''); await refresh(); await loadMeetings(); renderMeeting();
     if (problem) showError(problem); else if (processSaved && selectedMeeting.chunks.length) await processMeeting(id);
   } finally { meetingStopping = false; }
@@ -296,9 +306,9 @@ api.onEvent(event => {
   if (event.type === 'transcript') { $('transcript').value = event.text; paint(); }
   if (event.type === 'navigate') navigate(event.page);
   if (event.type === 'stop-meeting') stopMeeting().catch(showError);
-  if (event.type === 'quit-after-meeting') stopMeeting(null, false).then(() => api.quit()).catch(showError);
+  if (event.type === 'save-before-quit') saveRecordingBeforeQuit(event.token).catch(showError);
   if (event.type === 'connections') { snapshot.connections = event.connections; renderConnections($('connections')); }
-  if (event.type === 'download') { $('status').textContent = `Installing ${event.file} · ${event.percent}%`; if ($('setup-download-progress')) $('setup-download-progress').value = event.overall; if ($('setup-download-label')) $('setup-download-label').textContent = `${event.file} · ${event.percent}%`; }
+  if (event.type === 'download') { $('status').textContent = `Installing ${event.file} · ${event.percent}%`; setupController?.progress(`${event.file} · ${event.percent}%`); }
 });
 for (const button of document.querySelectorAll('[data-page]')) button.onclick = () => navigate(button.dataset.page);
 $('record').onclick = () => toggle().catch(showError); $('cancel').onclick = () => cancel().catch(showError);
@@ -319,7 +329,7 @@ $('download').onclick = async () => { try { await savePreferences(); await api.d
 $('accessibility').onclick = () => api.accessibility().catch(showError);
 $('launch-login').onchange = event => api.loginAtStartup(event.target.checked).catch(showError);
 $('new-meeting').onclick = () => openMeetingDialog(); $('meeting-dialog-cancel').onclick = () => $('meeting-dialog').close(); $('calendar-refresh').onclick = () => loadCalendar().catch(showError);
-document.addEventListener('keydown', event => { if (event.key === 'Escape' && state !== 'idle' && !$('setup-dialog').open) cancel().catch(showError); });
+document.addEventListener('keydown', event => { if (event.key === 'Escape' && state !== 'idle' && !document.querySelector('.matiq-setup-preview[open]')) cancel().catch(showError); });
 navigator.mediaDevices.addEventListener('devicechange', () => microphones().catch(showError));
 try {
   await refresh();
@@ -329,10 +339,12 @@ try {
   await microphones(); paint();
   if (snapshot.startupNotice) message(snapshot.startupNotice);
   if (!snapshot.shortcutReady) message('Background keyboard access is unavailable. Open Settings and check keyboard access.');
-  if (!snapshot.setup.completed) openSetup();
+  await initializeSetup();
 } catch (error) { showError(error); }
 
 $('show-app').hidden=navigator.platform.indexOf('Mac')===-1;
 $('show-app').onclick=()=>api.showApp().catch(showError);
 
 $('quit-app').onclick=()=>api.quit().catch(showError);
+
+$('saved-recordings').onclick=()=>api.openSavedRecordings().catch(showError);

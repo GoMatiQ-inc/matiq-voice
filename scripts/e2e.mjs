@@ -135,16 +135,19 @@ try {
   ownedBrowser = lifecycle.capture(browserServer.process());
   browser = await chromium.connect(browserServer.wsEndpoint());
   let page = await boot();
-  await scenario('fresh install checks hardware and recommends an English model', async () => {
-    await expect(page.locator('#setup-dialog')).toBeVisible(); await expect(page.locator('#setup-title')).toHaveText('Check this computer');
-    await expect(page.locator('#setup-content')).toContainText('4.0 GB');
-    assert.equal(await page.evaluate(() => typeof window.require), 'undefined');
-    await page.locator('#setup-next').click(); await expect(page.locator('#setup-model')).toHaveValue('base.en');
+  const wizard=page.getByRole('dialog',{name:'Voice setup',exact:true});
+  const next=()=>wizard.getByRole('button',{name:'Continue',exact:true}).click();
+  await scenario('fresh install requires explicit model choice and gates native recording',async()=>{
+    await expect(wizard).toBeVisible();
+    assert.equal(await page.evaluate(()=>typeof window.require),'undefined');
+    assert.equal((await page.evaluate(()=>window.matiqVoice.status())).hardware.memoryBytes,4*1024**3);
+    const blocked=await page.evaluate(()=>window.matiqVoice.begin().then(()=>'',error=>error.message));assert.match(blocked,/Complete setup/);
+    await wizard.getByLabel('English speech model',{exact:true}).selectOption('base.en');await next();
   });
   await scenario('failed model download is visible, retry verifies real model bytes', async () => {
-    await page.locator('#setup-download').click(); await expect(page.locator('#setup-error')).toContainText('503'); await expect(page.locator('#setup-next')).toBeDisabled();
-    await page.locator('#setup-download').click(); await expect(page.locator('#setup-download-label')).toContainText('All required models', {timeout: 120000});
-    const status = await page.evaluate(() => window.matiqVoice.status()); assert.equal(status.modelReady && status.speakerReady, true); await page.locator('#setup-next').click();
+    await wizard.getByRole('button',{name:'Download and verify models',exact:true}).click(); await expect(wizard.getByRole('alert')).toContainText('503'); await expect(wizard.getByRole('button',{name:'Continue',exact:true})).toBeDisabled();
+    await wizard.getByRole('button',{name:'Download and verify models',exact:true}).click(); await expect(wizard.locator('[data-setup-status]')).toHaveText('Verified.', {timeout:120000});
+    const status = await page.evaluate(() => window.matiqVoice.status()); assert.equal(status.modelReady && status.speakerReady, true); await next();
   });
   await scenario('Voice and Companion share verified speech assets without confusing them with LLMs',async()=>{
     assert.equal(sharedRoot(),companionSharedRoot());
@@ -164,15 +167,22 @@ try {
     assert.equal((await page.evaluate(()=>window.matiqVoice.status())).sharedModels.length,3);
   });
   await scenario('microphone check captures synthetic audio before setup completes', async () => {
-    await page.locator('#setup-test-microphone').click(); await expect(page.locator('#setup-content')).toContainText('Audio signal detected', {timeout: 15000});
-    await page.locator('#setup-next').click(); await page.locator('#setup-copy-only').check(); await expect(page.locator('#setup-next')).toBeEnabled(); await page.locator('#setup-next').click();
+    await wizard.getByLabel('Microphone',{exact:true}).selectOption('default');await next();
+    await wizard.getByRole('button',{name:'Test microphone',exact:true}).click();await expect(wizard.locator('[data-setup-status]')).toHaveText('Verified.',{timeout:15000});await next();
+    await wizard.getByLabel('Dictation controls',{exact:true}).selectOption('toggle');await next();
+    await wizard.getByLabel('Text insertion',{exact:true}).selectOption('copy');await next();
+    await wizard.getByRole('button',{name:'Check required permissions',exact:true}).click();await expect(wizard.locator('[data-setup-status]')).toHaveText('Verified.');await next();
+    await wizard.getByLabel('Calendar integration',{exact:true}).selectOption('none');await next();
+    await wizard.getByRole('checkbox').check();await next();await wizard.getByRole('button',{name:'Finish setup',exact:true}).click();await expect(wizard).not.toBeVisible();
+    await page.getByRole('button',{name:'Settings',exact:true}).click();
+
   });
   await scenario('OAuth denial stays disconnected; Microsoft and Google PKCE consent succeeds', async () => {
-    await consent(page, 'google', 'Decline'); await expect(page.locator('#setup-error')).toContainText('declined');
+    await consent(page, 'google', 'Decline'); await expect(page.locator('#notice')).toContainText('declined');
     assert.equal((await page.evaluate(() => window.matiqVoice.status())).connections.google.connected, false);
     for (const provider of ['microsoft', 'google']) { await consent(page, provider, 'Allow read-only calendar access'); await expect.poll(async () => (await page.evaluate(() => window.matiqVoice.status())).connections[provider].connected, {timeout: 20000}).toBe(true); }
     for (const provider of ['microsoft', 'google']) { const encrypted = await fs.readFile(path.join(profile, 'credentials', `${provider}.bin`)); assert.equal(encrypted.includes(Buffer.from('fixture-access-')), false); }
-    await page.locator('#setup-next').click(); await page.locator('#setup-next').click(); await expect(page.locator('#setup-dialog')).not.toBeVisible();
+    await page.getByRole('button',{name:'Dictation',exact:true}).click();
   });
   await scenario('floating indicator follows live levels, stays top-centered and never takes focus', async () => {
     const hud = desktop.windows().find(window => window.url().endsWith('/hud.html'));
@@ -300,7 +310,7 @@ try {
     await desktop.close(); desktop = null; page = await boot();
     assert.equal(modelRequests,before,'Restart must adopt existing verified Voice weights without network access.');
     assert.equal(await familyStore.verify({...speechAsset('base.en'),kind:'asr'}),true);
-    assert.equal((await page.evaluate(()=>window.matiqVoice.status())).sharedModels.length,3); await expect(page.locator('#setup-dialog')).not.toBeVisible();
+    assert.equal((await page.evaluate(()=>window.matiqVoice.status())).sharedModels.length,3); await expect(page.getByRole('dialog',{name:'Voice setup',exact:true})).not.toBeVisible();
     assert.equal((await page.evaluate(() => window.matiqVoice.status())).connections.google.connected, true);
     assert.deepEqual((await page.evaluate(() => window.matiqVoice.status())).settings.bindings, {toggle:['MetaRight'],hold:['AltRight']});
     await page.getByRole('button', {name: 'Meetings', exact: true}).click(); await page.locator('.meeting-item').filter({hasText: 'English speaker E2E'}).click(); await expect(page.locator('#speaker-remote-0')).toHaveValue('Alex');
@@ -309,6 +319,11 @@ try {
   });
   await scenario('disconnect removes protected local credentials', async () => {
     await page.getByRole('button', {name: 'Settings', exact: true}).click(); await page.locator('#connections button[data-provider="google"]').click(); await expect.poll(async () => (await page.evaluate(() => window.matiqVoice.status())).connections.google.connected).toBe(false); await assert.rejects(fs.access(path.join(profile, 'credentials', 'google.bin')));
+  });
+  await scenario('confirmed recording Quit saves its final synthetic audio; failed saves remain retryable',async()=>{
+    await require('./quit-recording-fixture.cjs').qualifyRecordingQuit({app:desktop,page,dataDir:profile});
+    desktop=null;page=await boot();
+    await expect(page.getByRole('dialog',{name:'Voice setup',exact:true})).not.toBeVisible();
   });
   await scenario('explicit update restart closes the window instead of hiding in the tray',async()=>{
     await page.evaluate(()=>window.matiqVoice.checkUpdates());
@@ -321,7 +336,7 @@ try {
   await fs.writeFile(path.join(fixtures, 'e2e-results.json'), JSON.stringify({result: 'passed', journeys: results, providers: 'Local fixtures', audio: 'Synthetic capture plus real English inference fixtures'}, null, 2));
   console.log(JSON.stringify({result: 'passed', journeys: results.length, scenarios: results, limitations: ['OAuth uses local fixture providers; real provider consent is not tested.', 'Microphone and system audio use synthetic devices, not a real Teams/Meet call.', 'Keyboard press/release events use an explicit helper-protocol fixture; native event-tap delivery and MacBook permissions require physical-key testing.', 'Actual English models, native inference, callback HTTP, OS-protected credential storage and persistence are exercised.']}, null, 2));
 } catch (error) {
-  if (desktop) { const page = desktop.windows().find(value => value.url().endsWith('/index.html')); if (page) { console.error('Visible failure:', await page.locator('#notice').textContent()); console.error('Setup failure:', await page.locator('#setup-error').textContent()); await page.screenshot({path: path.join(fixtures, 'e2e-failure.png'), fullPage: true}).catch(() => {}); } }
+  if (desktop) { const page = desktop.windows().find(value => value.url().endsWith('/index.html')); if (page) { console.error('Visible failure:', await page.locator('#notice').textContent()); console.error('Setup failure:', await page.locator('.matiq-setup-preview').textContent()); await page.screenshot({path: path.join(fixtures, 'e2e-failure.png'), fullPage: true}).catch(() => {}); } }
   console.error('E2E FAILED after', results.length, 'journeys:', error); process.exitCode = 1;
  } finally {
   const cleanupErrors=[];let runtimeClean=true;
