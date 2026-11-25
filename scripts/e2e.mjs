@@ -320,6 +320,11 @@ try {
   await scenario('disconnect removes protected local credentials', async () => {
     await page.getByRole('button', {name: 'Settings', exact: true}).click(); await page.locator('#connections button[data-provider="google"]').click(); await expect.poll(async () => (await page.evaluate(() => window.matiqVoice.status())).connections.google.connected).toBe(false); await assert.rejects(fs.access(path.join(profile, 'credentials', 'google.bin')));
   });
+  await scenario('confirmed recording Quit saves its final synthetic audio; failed saves remain retryable',async()=>{
+    await require('./quit-recording-fixture.cjs').qualifyRecordingQuit({app:desktop,page,dataDir:profile});
+    desktop=null;page=await boot();
+    await expect(page.getByRole('dialog',{name:'Voice setup',exact:true})).not.toBeVisible();
+  });
   await scenario('explicit update restart closes the window instead of hiding in the tray',async()=>{
     await page.evaluate(()=>window.matiqVoice.checkUpdates());
     await expect(page.locator('#update-install')).toBeEnabled();

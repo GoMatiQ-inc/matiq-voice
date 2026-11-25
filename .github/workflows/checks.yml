@@ -174,7 +174,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: GoMatiQ-inc/matiq-solutions
-          ref: fe010372a4e6bb46d2d92390fef842c8df80b39a
+          ref: 0b5ee492d1548a0f44211be7b98ee18f8d4553cf
           path: suite-host
       - name: Install the exact suite integration harness
         working-directory: suite-host
