@@ -1,9 +1,32 @@
 # Validation
 
-Checked 2026-10-26 on Apple Silicon. This file distinguishes implemented behavior
-from external account, platform and distribution qualification.
+Release evidence distinguishes implemented behavior from external account,
+platform and distribution qualification.
 
-## Local checks
+## Required setup and recording Quit — 2026-11-24
+
+[Voice0.3.15 release](https://github.com/GoMatiQ-inc/matiq-voice/releases/tag/v0.3.15)
+comes from source8bca4c926b93e95b0da4801ea8e94d3ae1611a6a.
+[Run45525673340](https://github.com/GoMatiQ-inc/matiq-voice/actions/runs/45525673340)
+passed both Mac and Windows desktop checks, protected Mac signing/notarization,
+packaged inference and actual hosted package qualification in Solutions0.1.3.
+Publication45527071468 succeeded. SDK/runtime/shell0.1.7 and Electron45.2.3 are
+used by both forms.
+
+The automated recording Quit journey verifies warning/cancellation, a controlled
+save failure that prevents exit, and retry saving the final valid WAV before
+actual process exit. Hosted tests additionally complete persisted required setup,
+transcribe real English fixture audio, retain recording when switching tools and
+refuse closing a recording tool. Owned processes/listeners are independently
+verified absent. Unit coverage includes retained meeting chunks and durable
+recovery audio.
+
+Audio qualification uses synthetic input and real recorded inference fixtures.
+It does not qualify a physical microphone, physical shortcut presses, new live
+calendar-provider approvals or broader hardware. The owner explicitly selected
+automated synthetic-audio qualification.
+
+## Local checks — historical 2026-10-26 baseline
 
 - 28 Node tests pass, including hardware selection, durable meeting storage,
   source-linked notes, WAV validation, PKCE/state, consent refusal, cancellation,
