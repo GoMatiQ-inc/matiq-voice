@@ -17,6 +17,7 @@ const fs=require('node:fs/promises'),path=require('node:path'),os=require('node:
   const refusal=await page.evaluate(id=>window.solutions.request('close',{id}).then(()=>'',error=>error.message),'com.matiq.voice');assert.match(refusal,/recording/);await tool.evaluate(()=>window.matiqVoice.cancel());await page.evaluate(id=>window.solutions.request('close',{id}),'com.matiq.voice');
   const nativePackage=config.catalog.tools[0].packages[process.platform+'-'+process.arch],archive=config.packages[nativePackage.url],artifacts={};for(const file of [archive,archive+'.release.json'])artifacts[path.basename(file)]=require('node:crypto').createHash('sha256').update(await fs.readFile(file)).digest('hex');
   await page.getByRole('button',{name:'MatiQ Solutions home',exact:true}).click();await page.getByRole('button',{name:'Voice',exact:true}).click();
+  await expect.poll(()=>app.context().pages().some(p=>p.url().includes('/src/ui/index.html'))).toBe(true);
   const reopened=app.context().pages().find(p=>p.url().includes('/src/ui/index.html'));assert.ok(reopened);
   await expect(reopened.getByRole('button',{name:'Start dictation',exact:true})).toBeEnabled();
   const recordingQuit=await require('./quit-recording-fixture.cjs').qualifyRecordingQuit({app,page:reopened,hostPage:page,dataDir:path.join(config.profile,'tools/com.matiq.voice')});app=null;owned=[];
