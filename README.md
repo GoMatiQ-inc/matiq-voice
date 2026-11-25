@@ -1,4 +1,4 @@
-<p><a href="https://matiqinc.com"><img src="https://raw.githubusercontent.com/GoMatiQ-inc/matiq-solutions/main/packages/shell/assets/matiq-solutions-wordmark-dark.png" alt="MatiQ Solutions, part of MatiQ Inc" width="220"></a></p>
+<p><a href="https://matiqinc.com"><img src="https://raw.githubusercontent.com/GoMatiQ-inc/.github/main/assets/github-banner.svg" alt="MatiQ Inc. Progress has a purpose." width="880"></a></p>
 
 # MatiQ Voice — Free Local Dictation for Mac and Windows
 
