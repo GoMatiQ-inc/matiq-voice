@@ -10,5 +10,5 @@
   "overrides": {
     "src/ui/capture.mjs": "prototype/capture.mjs"
   },
-  "baselineVersion": "0.3.13"
+  "baselineVersion": "0.3.15"
 }

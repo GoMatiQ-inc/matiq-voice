@@ -31,7 +31,7 @@
       autoPaste: true,
       bindings: { toggle: ["ControlRight"], hold: [] },
     },
-    setup: { completed: true, microphoneTested: true, launchAtLogin: false },
+    setup: { completed: false, microphoneTested: true, launchAtLogin: false },
     permissions: { accessibility: true, pasteError: "" },
     updates: {
       phase: "idle",
@@ -39,7 +39,7 @@
       message: "No updates available.",
     },
     installation: {
-      version: "0.3.13",
+      version: "0.3.15",
       path: hosted
         ? "MatiQ Solutions / Voice"
         : "/Applications/MatiQ Voice.app",

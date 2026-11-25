@@ -1,8 +1,8 @@
 const assert=require('node:assert/strict'),fs=require('node:fs/promises'),path=require('node:path');
 const lifecycle=require('@matiq-solutions/sdk/fixture-lifecycle.cjs');
 const {cleanupDesktop}=require('@matiq-solutions/sdk/fixture-cleanup.cjs');
-async function qualifyRecordingQuit({app,page,dataDir}){
- await page.getByRole('button',{name:'Dictation',exact:true}).click();
+async function qualifyRecordingQuit({app,page,hostPage,dataDir}){
+ await (hostPage||page).getByRole('button',{name:'Dictation',exact:true}).click();
  await page.evaluate(()=>{
   navigator.mediaDevices.getUserMedia=async()=>{
    const context=new AudioContext({sampleRate:16000,sinkId:{type:'none'}}),source=context.createOscillator(),gain=context.createGain(),output=context.createMediaStreamDestination();
