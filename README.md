@@ -1,4 +1,8 @@
+<p><a href="https://matiqinc.com"><img src="https://raw.githubusercontent.com/GoMatiQ-inc/matiq-solutions/main/packages/shell/assets/matiq-solutions-wordmark-dark.png" alt="MatiQ Solutions, part of MatiQ Inc" width="220"></a></p>
+
 # MatiQ Voice — Free Local Dictation for Mac and Windows
+
+[MatiQ Inc](https://matiqinc.com) · [Downloads](https://github.com/GoMatiQ-inc/matiq-voice/releases) · [Documentation](docs/VALIDATION.md) · [Report an issue](https://github.com/GoMatiQ-inc/matiq-voice/issues) · [License](LICENSE)
 
 **MatiQ Voice** is a free English speech-to-text and meeting-notes app by
 [MatiQ Inc](https://matiqinc.com). Dictate into the text field you are using,
@@ -300,9 +304,10 @@ missing. Installer assets remain separate from test logs and screenshots.
 
 ## About MatiQ Inc
 
-[MatiQ Inc — Applied AI & Engineering](https://matiqinc.com) helps organizations
-with digital transformation, enterprise AI training, and software development
-and AI engineering. We built MatiQ Voice around a practical need: software that
+[MatiQ Inc](https://matiqinc.com) builds businesses and technology for a better
+quality of life. Voice is part of MatiQ Solutions, alongside
+[Companion](https://github.com/GoMatiQ-inc/matiq-companion) for local AI work and
+[CopyCat](https://github.com/GoMatiQ-inc/matiq-copycat) for illustrated workflow guides. We built MatiQ Voice around a practical need: software that
 helps people get work done while keeping their words and recordings under their
 control. You do not need to be a MatiQ client or subscribe to a platform to use it.
 
